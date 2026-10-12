@@ -1,5 +1,6 @@
-import { ConsoleShell } from './ui/ConsoleShell'
+import { STARTUP_PRESENTATION } from './fixtures/startup'
+import { ScenarioStartup } from './ui/ScenarioStartup'
 
 export default function App() {
-  return <ConsoleShell />
+  return <ScenarioStartup presentation={STARTUP_PRESENTATION} />
 }

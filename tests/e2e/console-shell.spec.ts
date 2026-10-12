@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// TSB-11A covers the console layout only. The engine, controller and PixiJS plot are
-// not connected, so these checks prove presentation and accessibility, not gameplay.
+// M0 loads public scenario and own initial data. Engine/controller/PixiJS remain
+// unconnected; these checks prove startup presentation and accessibility, not gameplay.
 
 function collectErrors(page: Page) {
   const errors: string[] = []
@@ -23,14 +23,24 @@ async function pageOverflow(page: Page) {
   }))
 }
 
-test('labels the console as awaiting engine integration and runs no encounter', async ({ page }) => {
+test('loads public terrain and own initial data while gameplay remains unbound', async ({ page }) => {
   const errors = collectErrors(page)
   await page.goto('/')
 
   await expect(page).toHaveTitle('Shadow-Dancer — Tactical Space Battle')
   await expect(page.getByRole('heading', { level: 1, name: 'Shadow-Dancer' })).toBeVisible()
-  await expect(page.getByText('Engine not connected')).toBeVisible()
-  await expect(page.getByText('Plot offline')).toBeVisible()
+  await expect(page.getByText('Scenario loaded · M0')).toBeVisible()
+  await expect(page.getByText('Static public terrain · own marker (3, 10). Movement engine pending; no encounter is running.')).toBeVisible()
+  const own = page.getByRole('region', { name: 'Own ship', exact: true })
+  await expect(own.locator('dd')).toHaveText(['100 / 100', '40 / 40', '100 / 100', '6 / 6', 'Passive', 'Active'])
+  const plotReadout = page.getByRole('region', { name: 'Plot readout', exact: true })
+  await expect(plotReadout.locator('dd')).toHaveText(['(3, 10)', '0', '0'])
+  const scenario = page.getByRole('region', { name: 'Scenario', exact: true })
+  await expect(scenario.locator('dd')).toHaveText(['20 × 20', '12'])
+  await expect(page.getByRole('img', { name: 'Public scenario terrain' })).toHaveAccessibleDescription('20 by 20 grid with 12 known asteroid cells. Own ship at cell (3, 10). No enemy contacts.')
+  await expect(page.locator('[data-own-cell]')).toHaveAttribute('data-own-cell', '3,10')
+  expect(await page.locator('[data-asteroid-cell]').evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-asteroid-cell')))).toEqual(['7,4', '7,5', '8,5', '12,5', '13,5', '13,6', '6,13', '7,13', '7,14', '12,13', '12,14', '13,14'])
+  await expect(page.locator('[data-contact-alias], [data-enemy-position]')).toHaveCount(0)
 
   const phases = page.getByRole('list', { name: 'Turn phases' }).getByRole('listitem')
   await expect(phases).toHaveText(['Planning', 'Commit', 'Execution', 'Assessment'])
@@ -45,7 +55,9 @@ test('labels the console as awaiting engine integration and runs no encounter', 
 
   await commit.click({ force: true })
   await expect(page.locator('[aria-current]')).toHaveCount(0)
-  await expect(page.getByText('Engine not connected')).toBeVisible()
+  await expect(page.getByText('Scenario loaded · M0')).toBeVisible()
+  await page.getByRole('button', { name: 'Play', exact: true }).click({ force: true })
+  await expect(plotReadout.locator('dd')).toHaveText(['(3, 10)', '0', '0'])
   expect(errors).toEqual([])
 })
 
