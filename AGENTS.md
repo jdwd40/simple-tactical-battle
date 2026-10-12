@@ -4,7 +4,7 @@ The approved design is GAME_DESIGN.md, fixed tick semantics are WEGO_SPEC.md, sh
 
 The canonical status is `/home/jd/projects/tactical-space-battle/PROJECT_STATUS.md`, written only by the lead. Worktree copies can be stale. Workers return updates in their confirmed Herdr panes; never dispatch to other workers themselves or rename/reconfigure sessions.
 
-Verify your assigned absolute worktree, branch and starting commit before editing. Stay inside assigned file ownership. Shared contracts/scenarios belong to General, package/lockfiles/root configuration to Assistant, React/application presentation/PixiJS to UI; the lead sequences ownership transfers. Preserve unrelated changes. Do not commit PROJECT_STATUS.md from a worker worktree.
+Verify your assigned absolute worktree, branch and starting commit before editing. Stay inside assigned file ownership. Shared contracts/scenarios have one explicitly assigned owner (initial typed-contract fallback TSB-02 / attempt 2 is Assistant; ongoing engine/domain ownership is General), package/lockfiles/root configuration belong to Assistant, React/application presentation/PixiJS to UI; the lead sequences ownership transfers. Preserve unrelated changes. Do not commit PROJECT_STATUS.md from a worker worktree.
 
 Builders test their own changes and report actual commands/outcomes. Completion format: RESULT task/attempt; STATUS READY_FOR_REVIEW or BLOCKED; LOCATION worktree/branch; REVISION exact base/head; CHANGES; VERIFICATION; LIMITATIONS. Make scoped local commits. No remote push, default/release-branch merge or public deployment is authorised.
 
