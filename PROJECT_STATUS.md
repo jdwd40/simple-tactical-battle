@@ -1,71 +1,65 @@
 # Project status — Tactical Space Battle
 
-Canonical path: `/home/jd/projects/tactical-space-battle/PROJECT_STATUS.md`. Sole writer: orchestrator. Workers report updates; worktree copies are not canonical.
+Canonical: `/home/jd/projects/tactical-space-battle/PROJECT_STATUS.md`. Sole writer: lead. Worktree copies may be stale. Sole backlog: DEVELOPMENT_PLAN.md; approved rules: GAME_DESIGN.md / WEGO_SPEC.md; boundaries: ARCHITECTURE.md / AGENTS.md.
 
-## Current state
+## Authority and current milestone
 
-- Milestone: M0 — rules, contracts and runnable skeleton. Plan approved on 2026-10-12; executable scaffold preparation is underway. M0 is not complete.
-- Established requirements: the user's first playable duel brief, main build plan and fixed WEGO cycle/stack/exclusions. The user approved the baseline and automated implementation on 2026-10-12: "plan is aproved. All systems go."
-- Location: `/home/jd/projects/tactical-space-battle`, explicitly confirmed by the user on 2026-10-12. Newly created for planning documents; no existing project repository or instructions were found there.
-- Planning delivery: [GAME_DESIGN.md](GAME_DESIGN.md), [WEGO_SPEC.md](WEGO_SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and this record. AGENTS.md records durable worker conventions; executable work follows.
-- Git: initialised on local tsb/integration. Documentation baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e; no reviewed code yet.
-- Implementation: M0 scaffold reviewed and integrated; shared contracts are next. Independent review / code integration / executable demonstration: not yet delivered. No gameplay or human playtest results exist; scaffold checks are recorded below.
-- Planning validation: document inventory, references and work-package consistency checked. M0 scaffold dependencies and build/lint/browser checks have run; gameplay checks await implementation. Read-only setup checks are recorded below, separately from code delivery/review.
-- Demo / production build / accessible preview: none. Existing private Tailscale address 100.109.154.60 confirmed; reserve port 5280 for a private playable preview at M1/M2, with an SSH forwarding alternative; no public hosting action is authorised.
+User approved the plan on 2026-10-12: "plan is aproved. All systems go. Run automated as much as possible from now on". Implement through the M3 local release candidate, including automated assignments, tests and in-scope corrections. No release/default-branch merge, remote push or public deployment is authorised.
 
-M0 acceptance after approval: agreed rules/contracts, working dev/build/typecheck/lint/unit/browser commands, launchable application, loaded initial scenario and passing browser smoke test. A skeleton is not playable gameplay. Implementation is authorised through the scoped M3 local release candidate.
+Current M0: rules/contracts/runnable skeleton. Scaffold and console layout accepted; contracts reviewed/integrated; scenario startup remains for M0 acceptance. M0 acceptance: agreed contracts, working dev/build/typecheck/lint/unit/browser commands, initial scenario loaded, launch/browser smoke. No gameplay or human playtest acceptance yet.
+
+Repository `/home/jd/projects/tactical-space-battle`, local `tsb/integration`; HEADba5670ffb65eaa454da27ca84a6ce5876cabe486 (accepted console/contracts source); documentation checkpoint pending. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e. No remote configured. Canonical status updates are lead-authored and may be uncommitted between checkpoints.
 
 ## Live factory mapping
 
-Last confirmed on 2026-10-12: session `default`, workspace `w7`, directory `/home/jd`. Role evidence is the workers' own pane reports, plus the user's explicit reviewer assignment. Names/configurations are preserved. Revalidate addresses and availability before dispatch or after session changes.
+Last revalidated 2026-10-12, default Herdr session, workspace w7; names/configuration preserved. Revalidate after session changes and before dispatch. Explicit pane + own report verifies identity; focused-pane lookup can identify lead, and Codex subprocesses omit Herdr environment context.
 
-| Role | Pane / existing tab label | State |
+| Role | Pane / tab | Current work |
 | --- | --- | --- |
-| Orchestrator | `w7:p1` / `Sol6.1M` | Confirmed by this conversation |
-| General Builder | `w7:p3` / `opusx builder` | Confirmed role; TSB-02 attempt 1 stopped after repeated waits with no source changes. Available for later simulation assignment |
-| UI Builder | `w7:p5` / `opus UI` | Confirmed UI BUILDER READY report; TSB-02-UI-CHECK complete; active TSB-11A independent layout. Read frontend-design skill from the installed Claude plugin; no active assignment |
-| Assistant Builder | `w7:p6` / `codex Jnr` | Confirmed role and ASSISTANT BUILDER READY in SETUP-A01 / attempt 1; available, no active assignment |
-| Independent Reviewer | `w7:p7` / `sol6.1h Review` | User assigned role in this pane; subsequent own acknowledgement confirms Independent Reviewer and availability for scope/criteria. Ready; TSB-03A review completed PASS, no active review |
+| Lead | w7:p1 / Sol6.1M | Integration/orchestration |
+| General | w7:p3 / opusx builder | Available; TSB-02 attempt1 stopped, no source delivery |
+| UI | w7:p5 / opus UI | Typed UIcheck COMPLETE usable; console PASS/integrated; available |
+| Assistant | w7:p6 / codex Jnr | TSB-02 attempt3 PASS and integrated; available |
+| Reviewer | w7:p7 / sol6.1h Review | REVIEW-TSB-02 round0 PASS; available |
 
-Herdr 0.9.0 client/server and workspace discovery were verified. Codex tool subprocesses omit Herdr environment context; focused-pane lookup can identify the lead rather than the caller. Explicit pane inspection plus each unique delivered setup check confirms identity without inventing environment values.
+All role assignments confirmed by own-pane reports/user assignment. Reviewer acknowledged user's "yes this is the reviewer agent .. use this for reviewing". SETUP-A01/1 and SETUP-R01/1 were setup checks, not implementation PASS.
 
-## Task and review checkpoint
+## Deliveries and active revision checks
 
-The main plan's work packages replace earlier undispatched placeholder IDs; DEVELOPMENT_PLAN.md is the sole dependency-ordered backlog. No approved implementation or subsequent user decision was overwritten.
-
-| Tasks | Owner / dependency | Current state |
+| Task / owner | Location and branch | Revision / state |
 | --- | --- | --- |
-| TSB-01 | Lead; approved planning/reconciliation scope | Documentation reconciled; no code or independent code-review verdict |
-| TSB-02 | Assistant attempt 2, precise approved schema; General retains simulation/AI ownership | Attempt 1 stopped, no source delivery; attempt 2 preparing |
-| TSB-03 (increments TSB-03A/B) | Assistant; repository baseline, then TSB-02 for fixtures/scenario completion | TSB-03A REVIEWED/INTEGRATED, attempt 1, round 0 PASS; TSB-03B NOT_DISPATCHED |
-| TSB-10 / TSB-11 / TSB-12 | General / UI / Assistant; accepted M0, then real foundation/UI for regressions | TSB-11A independent layout ACTIVE attempt 1; 10/11B/12 waiting M0 |
-| TSB-20 / TSB-21 / TSB-22 | General / UI / Assistant; accepted M1, agreed sensor contracts, then integrated implementation | NOT_DISPATCHED |
-| TSB-30 / TSB-31 / TSB-32 | General / UI / Assistant; accepted M2A, agreed combat contracts, then integrated implementation | NOT_DISPATCHED |
-| TSB-40 / TSB-41 / TSB-42 | General / UI / Assistant; accepted M2B, then integrated AI/mission flow | NOT_DISPATCHED |
-| TSB-50 / TSB-51 / TSB-52 | UI / General / Assistant; accepted M2, evidenced findings, then combined release verification | NOT_DISPATCHED |
+| TSB-01 lead | canonical repository | Approved planning reconciliation complete |
+| TSB-03A Assistant / attempt1 | ../tactical-space-battle-worktrees/assistant-03a, tsb/03a-scaffold | Base c315b14, delivered85223d31ad454bc6b56f60e830904e531728a579; review round0 PASS; integrated08e14d9 |
+| TSB-02 General / attempt1 | ../tactical-space-battle-worktrees/general-02, tsb/02-contracts | Clean base7d58e4373b77b94e224fd2cc0214e58044aafbbd preserved; stopped after repeated finite waits with no source changes; no success claimed |
+| TSB-02 Assistant / attempt2 | ../tactical-space-battle-worktrees/assistant-02, tsb/02-contracts-a2 | Base7890bf9399111ef97b736de908441c76cfd02632; delivered66c6346275622a417db00adca247c30f82e8cb2a; UItypedcheckusable; finalhead592d7955cbd93bc63855e5d0bd996c4401c4cf0b round0 PASS, integrated as228dd87/ba5670f |
+| TSB-11A UI / attempt1→2 | ../tactical-space-battle-worktrees/ui-11a, tsb/11a-console | Base7d58e43; headf7d2ebdeb53380fa98878b5ddc9505769c06a095 round0 CHANGES_REQUIRED; fixeb38b7efeb0fee5629c7ad7277d489aaa45e6d64 round1 PASS, both commits locally integrated |
 
-TSB-03A / attempt 1: Assistant w7:p6; reserved worktree /home/jd/projects/tactical-space-battle-worktrees/assistant-03a, branch tsb/03a-scaffold. Base c315b14409ce101fc5c296bc5e533ee91ca9bc7e; head 85223d31ad454bc6b56f60e830904e531728a579. Browser smoke 1 passed; unit harness 0 tests. Review snapshot /home/jd/projects/tactical-space-battle-worktrees/reviews/03a-r0, port 4381. Remaining implementation locations/revisions unassigned. TSB-03A: PASS at 85223d31ad454bc6b56f60e830904e531728a579; integrated as 08e14d9. Review report /home/jd/projects/tactical-space-battle-worktrees/handoffs/TSB-03A-review-r0.md. TSB-03A combined checks on tsb/integration: npm ci, npm run build (includes typecheck), npm run lint and TSB_BROWSER_PORT=4391 npm run test:e2e passed; 1 Chromium smoke. General TSB-02 attempt 1 stopped and preserved at clean base 7d58e4373b77b94e224fd2cc0214e58044aafbbd in /home/jd/projects/tactical-space-battle-worktrees/general-02, tsb/02-contracts. No successful completion or code review claimed for it. UI TSB-02-UI-CHECK / attempt 1 COMPLETE; concrete API/data refinements accepted in /home/jd/projects/tactical-space-battle-worktrees/handoffs/TSB-02-ui-decisions.md; Assistant/reviewer idle. Every later review receives the exact delivered revision in an isolated snapshot, original acceptance/contracts and actual builder checks; initial review plus at most two correction rounds.
+Review snapshots (absolute root `/home/jd/projects/tactical-space-battle-worktrees/reviews`): 03a-r0@85223d3; 11a-r0@f7d2ebd; 11a-r1@eb38b7e (port4385); 02-r0@66c6346 (immutable, UI read-only now, independent review next). Reports/handoffs: `/home/jd/projects/tactical-space-battle-worktrees/handoffs`. 03A review and 11A round0 reports archived there. Initial review + at most two correction rounds; no approval applies to subsequent material edits.
 
-Setup deliveries only: SETUP-A01 / attempt 1 confirmed the Assistant's role and explicit pane; SETUP-R01 / attempt 1 initially found the reviewer prompt pending; the user then supplied "yes this is the reviewer agent .. use this for reviewing", and the reviewer acknowledged its assignment. Both finite prompt waits completed and reports were collected from the assigned panes matching ID/attempt. Neither is a code-review PASS or implementation delivery.
+11A finding: medium blocking production fonts omitted copyright/full OFL text. Fix ships `public/assets/barlow-fonts-OFL.txt`; build/HTTP evidence supplied. One correction round used. Static licensed fonts (~90KB) accepted by lead; no dependency/asset pipeline expansion.
 
-## Decisions, dependencies and next action
+## Verification actually observed
 
-Approved baseline retained: fixed-point deterministic routes, 100ms simultaneous damage batches, one conditional weapon shot per turn, plotted non-homing missiles, energy priority, no shield regeneration, private engine and observer-only UI/AI/replay. Initial numerical values remain tuning hypotheses.
+- 03A builder/reviewer: install, build/type/lint passed; zero unit tests explicitly allowed, 1 Chromium smoke. Reviewer also inspected production keyboard/layout. Combined canonical npm ci/build/lint and port4391 browser smoke passed.
+- 02 attempt2 builder: npm ci/build/type/lint passed; 42 unit tests in3files; 1 Chromium smoke at4273. Runtime simulation/replay information enforcement not implemented or proven yet.
+- 11A builder and initial reviewer: 6 unit/6 Chromium tests; actual dev/production screenshots at1366x768,1024x700,390x844, focus and reduced-motion. No gameplay/Pixi/controller binding yet. Fix builder: 8 unit/7 browser tests; build emits byte-identical license and production HTTP200 text/plain matches source; relevant ports freed.
 
-The main plan supersedes earlier unapproved proposals: one first-tick active pulse replaces recurring pulses; successful scan/fire keeps cloak off until a later planning phase; movement increases detection signature; AI uses PATROL/INVESTIGATE/ENGAGE/SEARCH; either living survivor can plan evasive turns while ordnance persists, including automatic observation-only AI turns after player destruction. Add the brief mission introduction and abandon/restart flow. No new campaign or expansion requirements.
+Current demo/build: reviewed scaffold/console shell only; no playable preview yet. Reserve private Tailscale100.109.154.60:5280 for M1/M2 preview; provide SSH forwarding alternative. Public deployment remains separate. Browser coverage Chromium; no manual screenreader or human gameplay check claimed.
 
-Setup dependencies are resolved: project location, implementation approval and all five roles. Three builders and the reviewer are available. Collect exact task/attempt/revision reports, never infer task success from idle/READY alone.
+## Decisions, dependencies and next actions
 
-Next action: reconcile live panes/files, initialise Git and a local baseline, assign TSB-03A / attempt 1 to the available Assistant in an isolated worktree. Review/integrate it, assign General TSB-02 with a read-only UI usability check, then Assistant TSB-03B. Release General TSB-10 and UI TSB-11 in parallel only after M0 acceptance. Actual paths/branches/revisions/ports are assigned then, not guessed now.
+Approved mechanics are unchanged. Lead-accepted UI refinements: stable getView/subscribe and encounter/revision identity; observer-safe own route/nominal preview; explicit phases/commit results/validation/assessment; replay data only through cursor, no unseen interpolation. Latest player-turn replay includes attached automatic aftermath, no encounter-wide replay browser. Decisions file: handoffs/TSB-02-ui-decisions.md.
 
-Policy: implementation and local reviewed integration through M3 are authorised. Automated assignments, checks and in-scope corrections proceed without repeated approval. No release/default-branch merge, push or deployment authorised. After implementation authorisation, deliver a reviewed and tested local integration candidate; external release actions require explicit permission.
+Initial contract typing transferred to Assistant attempt2 after clean General attempt1 made no source progress across bounded waits and scope steering; it implements agreed concrete payload/config specs, not new architecture. General remains engine/combat/AI owner. TSB-11A independent React composition ran after accepted tooling; gameplay/Pixi/controller binding still waits for M0 contracts. Root config/lockfile remains single-owner Assistant; UI owns presentation; source writes isolated by worktree.
 
-Completion states: IMPLEMENTED — no; REVIEWED — no; INTEGRATED — no; READY_TO_MERGE — no; DEPLOYED — no. Human gameplay acceptance has not been requested because there is no playable duel yet. Stop the authorised build at the scoped release candidate; optional expansion work does not extend the run.
+Next: collect 11A focused verdict; independently review exact02 delivery after typed UI check; route defects to owners within correction limit; integrate accepted revisions and run combined checks. Combined console checks on canonical6dc5593 passed: build,unit8/2files,browser7at4391. Then Assistant TSB-03B scenario fixtures/startup smoke completes M0. General TSB-10 and UI TSB-11B real foundation/presentation follow; supporting regressions after usable interfaces.
 
-Optional future encounter/ship ideas are recorded only in GAME_DESIGN.md and do not block this release.
+Remaining work packages (NOT_DISPATCHED unless recorded above): TSB-03B,10,11B,12;20/21/22;30/31/32;40/41/42;50/51/52. Their roles/dependencies/acceptance remain the sole DEVELOPMENT_PLAN.md backlog. No invented expansion tasks.
 
-Contract refinements: stable controller view/subscription and encounter ID, observer-safe own route/nominal preview, history only through replay cursor, explicit phase/commit/validation/assessment shapes. Latest player-turn replay includes automatic aftermath; no encounter-wide replay browser required. Numeric mechanics unchanged.
+Completion: IMPLEMENTED partial; REVIEWED scaffold and console; INTEGRATED scaffold and console; READY_TO_MERGE no; DEPLOYED no. Stop at the scoped reviewed/tested local release candidate; record human acceptance separately.
 
-TSB-11A / attempt 1: UI w7:p5; /home/jd/projects/tactical-space-battle-worktrees/ui-11a, tsb/11a-console, base 7d58e4373b77b94e224fd2cc0214e58044aafbbd, port 4272. Sequencing refinement: independent React console composition can run after accepted tooling; gameplay binding/Pixi/controller still wait for M0 contracts. General owns contracts/scenarios, UI owns layout files, no shared write overlap.
+11A round1 PASS at eb38b7efeb0fee5629c7ad7277d489aaa45e6d64: focused build/type/lint/unit8 + browser license1, source/dist/production license equality, fonts HTTP200; previous visual evidence valid. Contracts UItypedcheck at66c6346 usable; three nonblocking refinements accepted and batched in Assistant attempt3 before independent review round0 (replay origin, controller playback-clock ownership, tick-only events/prefix accumulation).
 
-Ownership decision: contract implementation attempt 1 made no files after repeated finite waits and scope steering; stopped its active turn, verified clean base and settled pane. Transfer bounded concrete contract typing/config/scenario task to Assistant attempt 2; no model/session changes, no rule changes. General remains simulation/combat/AI owner.
+Final02 review snapshot /home/jd/projects/tactical-space-battle-worktrees/reviews/02-r0-a3@592d7955cbd93bc63855e5d0bd996c4401c4cf0b, base7890bf9; source-only refinement review round0 active.
+
+02 independent review round0 PASS at592d7955cbd93bc63855e5d0bd996c4401c4cf0b: build/type/lint,42unit/3files,35 additional probes (timing sizes, rejection/overflow, serialization/isolation); runtime engine obligations explicitly deferred. Canonical combined build/lint/unit50 passed after console+contracts integration.
