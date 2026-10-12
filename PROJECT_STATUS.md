@@ -8,8 +8,8 @@ Canonical path: `/home/jd/projects/tactical-space-battle/PROJECT_STATUS.md`. Sol
 - Established requirements: the user's first playable duel brief, main build plan and fixed WEGO cycle/stack/exclusions. The user approved the baseline and automated implementation on 2026-10-12: "plan is aproved. All systems go."
 - Location: `/home/jd/projects/tactical-space-battle`, explicitly confirmed by the user on 2026-10-12. Newly created for planning documents; no existing project repository or instructions were found there.
 - Planning delivery: [GAME_DESIGN.md](GAME_DESIGN.md), [WEGO_SPEC.md](WEGO_SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and this record. AGENTS.md records durable worker conventions; executable work follows.
-- Git: initialised on local tsb/integration. Initial documentation baseline being committed; no reviewed code yet.
-- Implementation: starting M0 scaffolding. Independent review / code integration / executable demonstration: not yet delivered. No gameplay, automated or human playtest results exist.
+- Git: initialised on local tsb/integration. Documentation baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e; no reviewed code yet.
+- Implementation: M0 scaffold reviewed and integrated; shared contracts are next. Independent review / code integration / executable demonstration: not yet delivered. No gameplay, automated or human playtest results exist.
 - Planning validation: document inventory, references and work-package consistency checked. No application checks or dependency installation have occurred yet. Read-only setup checks are recorded below, separately from code delivery/review.
 - Demo / production build / accessible preview: none. Preview access/forwarding remains to be established before the first interactive checkpoint; no public hosting action is authorised.
 
@@ -37,14 +37,14 @@ The main plan's work packages replace earlier undispatched placeholder IDs; DEVE
 | --- | --- | --- |
 | TSB-01 | Lead; approved planning/reconciliation scope | Documentation reconciled; no code or independent code-review verdict |
 | TSB-02 | General; TSB-03A tooling, approved rules | NOT_DISPATCHED; UI usability check then lead contract acceptance |
-| TSB-03 (increments TSB-03A/B) | Assistant; repository baseline, then TSB-02 for fixtures/scenario completion | TSB-03A preparing, attempt 1; TSB-03B NOT_DISPATCHED |
+| TSB-03 (increments TSB-03A/B) | Assistant; repository baseline, then TSB-02 for fixtures/scenario completion | TSB-03A REVIEWED/INTEGRATED, attempt 1, round 0 PASS; TSB-03B NOT_DISPATCHED |
 | TSB-10 / TSB-11 / TSB-12 | General / UI / Assistant; accepted M0, then real foundation/UI for regressions | NOT_DISPATCHED |
 | TSB-20 / TSB-21 / TSB-22 | General / UI / Assistant; accepted M1, agreed sensor contracts, then integrated implementation | NOT_DISPATCHED |
 | TSB-30 / TSB-31 / TSB-32 | General / UI / Assistant; accepted M2A, agreed combat contracts, then integrated implementation | NOT_DISPATCHED |
 | TSB-40 / TSB-41 / TSB-42 | General / UI / Assistant; accepted M2B, then integrated AI/mission flow | NOT_DISPATCHED |
 | TSB-50 / TSB-51 / TSB-52 | UI / General / Assistant; accepted M2, evidenced findings, then combined release verification | NOT_DISPATCHED |
 
-TSB-03A / attempt 1: Assistant w7:p6; reserved worktree /home/jd/projects/tactical-space-battle-worktrees/assistant-03a, branch tsb/03a-scaffold. Base/head pending baseline commit and delivery. Remaining implementation locations/revisions unassigned. Review outcomes: none. No assignment sent yet; no pending code reviews. Every later review receives the exact delivered revision in an isolated snapshot, original acceptance/contracts and actual builder checks; initial review plus at most two correction rounds.
+TSB-03A / attempt 1: Assistant w7:p6; reserved worktree /home/jd/projects/tactical-space-battle-worktrees/assistant-03a, branch tsb/03a-scaffold. Base c315b14409ce101fc5c296bc5e533ee91ca9bc7e; head 85223d31ad454bc6b56f60e830904e531728a579. Browser smoke 1 passed; unit harness 0 tests. Review snapshot /home/jd/projects/tactical-space-battle-worktrees/reviews/03a-r0, port 4381. Remaining implementation locations/revisions unassigned. TSB-03A: PASS at 85223d31ad454bc6b56f60e830904e531728a579; integrated as 08e14d9. Review report /home/jd/projects/tactical-space-battle-worktrees/handoffs/TSB-03A-review-r0.md. TSB-03A combined checks on tsb/integration: npm ci, npm run build (includes typecheck), npm run lint and TSB_BROWSER_PORT=4391 npm run test:e2e passed; 1 Chromium smoke. General TSB-02 preparing next; other workers idle. Every later review receives the exact delivered revision in an isolated snapshot, original acceptance/contracts and actual builder checks; initial review plus at most two correction rounds.
 
 Setup deliveries only: SETUP-A01 / attempt 1 confirmed the Assistant's role and explicit pane; SETUP-R01 / attempt 1 initially found the reviewer prompt pending; the user then supplied "yes this is the reviewer agent .. use this for reviewing", and the reviewer acknowledged its assignment. Both finite prompt waits completed and reports were collected from the assigned panes matching ID/attempt. Neither is a code-review PASS or implementation delivery.
 
