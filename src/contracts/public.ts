@@ -167,6 +167,7 @@ export interface SideObservation {
   readonly contacts: readonly ContactMemory[]
   readonly ownMissiles: readonly OwnMissileTelemetry[]
   readonly hostileMissiles: readonly HostileOrdnanceMemory[]
+  /** Permitted events at this observation's tick only; same events as its replay frame. */
   readonly events: readonly VisibleEvent[]
   readonly observedOpponentDestructionTick?: Tick
   readonly outcome?: RevealedOutcome
@@ -179,7 +180,9 @@ export interface PlannerMemory {
   readonly observedOpponentDestructionTick?: Tick
 }
 export interface PublicReplayFrame {
-  readonly tick: Tick; readonly observation: SideObservation; readonly events: readonly VisibleEvent[]
+  readonly tick: Tick; readonly observation: SideObservation
+  /** This tick only, identical permitted events to observation.events. */
+  readonly events: readonly VisibleEvent[]
 }
 export type UnfiredReason = 'no-current-lock' | 'out-of-range' | 'line-of-sight-blocked' | 'cooldown' | 'insufficient-energy' | 'own-destroyed'
 export interface OwnAssessment {
@@ -196,9 +199,14 @@ export interface OwnAssessment {
 }
 export interface ReplayPrefix {
   readonly scope: 'latest-player-turn-with-aftermath'
-  readonly startTick: Tick; readonly endTick: Tick; readonly cursorTick: Tick
+  readonly startTick: Tick
+  /** Scheduled known window boundary; never a precomputed future aftermath horizon. */
+  readonly endTick: Tick
+  readonly cursorTick: Tick
   /** Only starting frame and tick frames <= cursor; never the future TurnPresentation. */
-  readonly frames: readonly PublicReplayFrame[]; readonly events: readonly VisibleEvent[]
+  readonly frames: readonly PublicReplayFrame[]
+  /** Accumulated through cursor, deduplicated by event ID and ordered by (tick, id). */
+  readonly events: readonly VisibleEvent[]
   readonly playback: { readonly playing: boolean; readonly speed: 0.5 | 1 | 2 | 4 }
 }
 interface ViewBase {
@@ -208,7 +216,11 @@ interface ViewBase {
 export type GameView = ViewBase & (
   | { readonly phase: 'planning'; readonly draft: TurnOrders; readonly validation: OrderValidation; readonly routePreview: OwnRoutePreview; readonly replay: null }
   | { readonly phase: 'commit'; readonly lockedOwnOrders: TurnOrders; readonly replay: null }
-  | { readonly phase: 'execution'; readonly replay: ReplayPrefix } & ({ readonly automatic: false; readonly lockedOwnOrders: TurnOrders } | { readonly automatic: true; readonly reason: 'own-destroyed'; readonly lockedOwnOrders: TurnOrders | null })
+  | {
+    readonly phase: 'execution'; readonly replay: ReplayPrefix
+    /** null on live playback; origin only after user replay from an assessed/terminal view. */
+    readonly replayOf: null | 'assessment' | 'terminal'
+  } & ({ readonly automatic: false; readonly lockedOwnOrders: TurnOrders } | { readonly automatic: true; readonly reason: 'own-destroyed'; readonly lockedOwnOrders: TurnOrders | null })
   | { readonly phase: 'assessment'; readonly lockedOwnOrders: TurnOrders | null; readonly replay: ReplayPrefix; readonly assessment: OwnAssessment }
   | { readonly phase: 'terminal'; readonly lockedOwnOrders: TurnOrders | null; readonly replay: ReplayPrefix | null; readonly result: { readonly kind: 'abandoned' } | { readonly kind: 'combat'; readonly outcome: RevealedOutcome; readonly assessment: OwnAssessment } }
 )
@@ -228,6 +240,7 @@ export interface GameController {
   subscribe(listener: () => void): () => void
   setDraft(orders: TurnOrders): void
   commit(expectedTurnIndex: number): CommitResult
+  /** Owns the presentation clock; publishes changed integer cursor/control state, never clocks simulation. */
   playback(command: PlaybackCommand): void
   finishAssessment(): void
   abandon(): void
