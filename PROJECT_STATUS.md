@@ -14,15 +14,15 @@ Repository /home/jd/projects/tactical-space-battle, local tsb/integration, accep
 
 ## Confirmed factory mapping
 
-Revalidated 2026-10-12 in Herdr workspace w7; preserve names/configurations. Roles confirmed by own-pane reports/user assignments, not model labels. Explicit pane identity/user confirmation establish caller despite Codex subprocesses omitting Herdr environment. Revalidate after restarts/moves.
+Herdr shut down at22:58:38 UTC on2026-10-12 (server log; cause not established). Lead inadvertently invoked server startup while checking availability at22:58:58; saved w7 tab/pane topology restored, new terminal IDs. Original Claude session UUIDs restored at p3/p5, blocked by /home/jd folder-trust prompts; user confirmation requested per bundled Herdr skill. Codex p6/p7 initially restored as empty shells; exact original session UUIDs identified from task histories and resumption initiated without model/config overrides. Lead's current tool channel remains active; no duplicate lead session launched. Revalidate identity/readiness after recovery; do not dispatch on tab labels alone.
 
 | Role | Pane / tab | Current state |
 | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | Integration/orchestration |
-| General | w7:p3 / opusx builder | TSB-10 / attempt1 active; checkpoint requested after no source/tool progress since22:38 |
-| UI | w7:p5 / opus UI | TSB-11B / attempt1 active, renderer/new controls |
-| Assistant | w7:p6 / codex Jnr | TSB-03B accepted/integrated; no active assignment |
-| Reviewer | w7:p7 / sol6.1h Review | REVIEW-TSB-03B /1/round0 PASS; available |
+| General | w7:p3 / opusx builder | Original Claude session restored; trust prompt pending;10 delivered |
+| UI | w7:p5 / opus UI | Original session restored; trust prompt pending;11B uncommitted work preserved |
+| Assistant | w7:p6 / codex Jnr | Original session recovered/confirmed; active TSB-12A /1 bounded headless regressions |
+| Reviewer | w7:p7 / sol6.1h Review | Original session recovered; REVIEW-TSB-10 /1/round0 PASS collected; available |
 
 One assignment per builder. Lead alone dispatches; reviewer source read-only. Initial review plus at most two correction rounds. Paths below are under /home/jd/projects/tactical-space-battle-worktrees.
 
@@ -36,7 +36,8 @@ One assignment per builder. Lead alone dispatches; reviewer source read-only. In
 | TSB-02 Assistant /2→3 | assistant-02 / tsb/02-contracts-a2 / 7890bf9399111ef97b736de908441c76cfd02632 | 66c6346 then592d7955cbd93bc63855e5d0bd996c4401c4cf0b; typed UI check usable; round0 PASS; integrated228dd87/ba5670f |
 | TSB-11A UI /1→2 | ui-11a / tsb/11a-console / 7d58e43 | f7d2ebd round0 CHANGES_REQUIRED (production font licence); eb38b7efeb0fee5629c7ad7277d489aaa45e6d64 round1 PASS; integratedff0b88f/6dc5593 |
 | TSB-03B Assistant /1 | assistant-03b / tsb/03b-fixtures / cf58c7d1c531191be470d9b45646d30860413f37 | 0e4368000fd5b2d882c5acf473f13496641ff55a; round0 PASS; integratedb71fe73 |
-| TSB-10 General /1 | general-10 / tsb/10-foundation / cf58c7d1c531191be470d9b45646d30860413f37 | Active; simulation only; no delivery/review |
+| TSB-10 General /1 | general-10 / tsb/10-foundation / cf58c7d1c531191be470d9b45646d30860413f37 | 041e441e516d842cc2423e96c637c61ff0d323c3; round0 PASS, integratedd8a62d9; combined build/type/lint/unit92passed |
+| TSB-12A Assistant /1 | assistant-12a / tsb/12a-regressions / d8a62d9 | Active multi-turn/JSON/configured-timing/reinitialization regressions; new tests only;12B browser/controller follows11C |
 | TSB-11B UI /1 | ui-11b / tsb/11b-battlefield / cf58c7d1c531191be470d9b45646d30860413f37 | Active; renderer/new components/tests; excludes App/root styling/config/controller |
 
 Review snapshots: reviews/03a-r0@85223d3;11a-r0@f7d2ebd;11a-r1@eb38b7e;02-r0-a3@592d795;03b-r0@0e436. Original handoffs and collected reports in handoffs. Approval applies only to reviewed revision.
@@ -56,8 +57,8 @@ Chromium coverage. No human gameplay acceptance or screenreader audit claimed. N
 
 Approved baseline unchanged; numerical values are tuning hypotheses. Accepted refinements: stable getView/subscribe and encounter/revision identity; own route preview; cursor-prefix-only replay; controller-owned clock; historical replay origin without future outcome; tick-only frame events and deduplicated accumulated prefix. Latest player turn plus automatic aftermath is replay scope. Decisions: handoffs/TSB-02-ui-decisions.md and contracts/README.md.
 
-Initial concrete schema typing transferred to Assistant after General02 stalled without edits; General retains engine/combat/AI. General10 has no changes after ten minutes since last tool output; same-task steering delivered to inspect actual blocker, configuration unchanged. UI11B producing renderer files.
+Initial concrete schema typing transferred to Assistant after General02 stalled without edits; General retains engine/combat/AI. General10 resumed concrete implementation after same-task checkpoint steering; type/lint checks clean, tests underway, configuration unchanged. UI11B is checking actual Pixi rendering in Chromium and building focused tests.
 
-Next: collect10/11B exact reports; independent review, focused fixes, integration and combined checks. Then UI11C real controller binding and Assistant12 lifecycle regressions. Continue20/21/22,30/31/32,40/41/42,50/51/52 through scoped release candidate. Sole task acceptance/dependencies remain DEVELOPMENT_PLAN.md.
+Next: recover Claude panes after pending trust confirmation; UI11B finishes preserved work and delivers exact revision, then review/integrate; UI11C real controller binding follows.12A can progress independently;12B covers browser/controller lifecycle after11C. General10 review PASS collected from resumed original pane:85unit,20turns/3600segments at4tick sizes,1709adversarial assertions incl500geometry cases/6funding calculations/hidden-state equivalence. Combined canonical build/type/lint/unit92passed. Continue20/21/22,30/31/32,40/41/42,50/51/52 through scoped release candidate; sole acceptance/dependencies remain DEVELOPMENT_PLAN.md.
 
 Completion: IMPLEMENTED M0; REVIEWED M0; INTEGRATED M0; READY_TO_MERGE no; DEPLOYED no. Human playtest requested at complete duel; human and technical acceptance separate.
