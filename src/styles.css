@@ -1,12 +1,406 @@
 @import "tailwindcss";
 
-:root {
-  font-family: system-ui, sans-serif;
-  color: #f1f5f9;
-  background: #0b1420;
-  color-scheme: dark;
+/*
+ * Shadow-Dancer command console tokens.
+ *
+ * Direction: a darkened attack centre. The plotting table is the recessed,
+ * darkest surface; side consoles are flat steel bulkheads separated by seams.
+ * Accents carry meaning, never decoration:
+ *   command  amber — own ship, own orders, the Commit Turn key, focus, current phase
+ *   sonar    sea-glass — sensor and informational states
+ *   hostile  coral — enemy contacts and hostile ordnance (reserved for the plot)
+ * Line style is the non-colour channel: solid = live/available,
+ * dashed = not live (stale contact, unavailable control, pending system).
+ */
+
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./ui/fonts/barlow-semi-condensed-latin-400-normal.woff2") format("woff2");
 }
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./ui/fonts/barlow-semi-condensed-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./ui/fonts/barlow-semi-condensed-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./ui/fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");
+}
+
+@theme {
+  --font-console: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-display: "Barlow Condensed", "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+
+  --color-hull: #101b1c;
+  --color-bulkhead: #162425;
+  --color-well: #0a1314;
+  --color-raised: #1d2f30;
+  --color-seam: #2b3f40;
+  --color-edge: #64807d;
+  --color-ink: #e2eae5;
+  --color-ink-muted: #a6bab4;
+  --color-ink-faint: #839a94;
+  --color-command: #f0b44a;
+  --color-command-ink: #1b1407;
+  --color-sonar: #86c9bd;
+  --color-hostile: #ef9078;
+
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.25rem;
+  --text-body: 1rem;
+  --text-body--line-height: 1.45rem;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.5rem;
+  --text-readout: 1.375rem;
+  --text-readout--line-height: 1.75rem;
+  --text-ship: 1.75rem;
+  --text-ship--line-height: 2rem;
+}
+
+:root {
+  --duration-quick: 120ms;
+  font-family: var(--font-console);
+  font-size: 100%;
+  line-height: var(--text-body--line-height);
+  color: var(--color-ink);
+  background: var(--color-hull);
+  color-scheme: dark;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
 body { margin: 0; min-width: 320px; }
-:focus-visible { outline: 3px solid #67e8f9; outline-offset: 5px; }
-.skip-link { position: absolute; top: 1rem; left: 1rem; transform: translateY(-200%); }
-.skip-link:focus { transform: translateY(0); background: #0b1420; padding: 0.5rem; }
+
+:focus-visible {
+  outline: 2px solid var(--color-command);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 10;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-hull);
+  color: var(--color-ink);
+  border: 1px solid var(--color-edge);
+  transform: translateY(-200%);
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* Layout: header over a deck of rails around the plotting table. */
+.console {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 36rem;
+}
+
+.console-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 2rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-seam);
+  background: var(--color-hull);
+}
+
+.console-deck {
+  display: grid;
+  gap: 1px;
+  min-height: 0;
+  background: var(--color-seam);
+  grid-template-columns: 18.5rem minmax(0, 1fr) 21rem;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "ship plot command"
+    "ship transport command";
+}
+
+.deck-ship { grid-area: ship; }
+.deck-plot { grid-area: plot; }
+.deck-transport { grid-area: transport; }
+.deck-command { grid-area: command; }
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--color-bulkhead);
+}
+
+@media (max-width: 1199px) {
+  .console-header { column-gap: 1.25rem; }
+  .mission-line { display: none; }
+  .phase-step { padding-inline: 0.375rem; }
+  .phase-step + .phase-step::before { display: none; }
+  .deck-ship .readouts { grid-template-columns: repeat(2, minmax(0, 1fr) auto); column-gap: 1.25rem; }
+  .console-deck {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "plot ship"
+      "plot command"
+      "transport command";
+  }
+}
+
+@media (max-width: 759px) {
+  .console { height: auto; min-height: 100dvh; }
+  .console-deck {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas: "plot" "transport" "ship" "command";
+  }
+  .deck-plot { aspect-ratio: 1 / 1; }
+  .rail { overflow: visible; }
+}
+
+/* Panels: flat sections on a rail, separated by seams rather than cards. */
+.panel { padding: 0.875rem 1rem 1rem; }
+.panel + .panel,
+.panel + .commit-station,
+.commit-station + .panel { border-top: 1px solid var(--color-seam); }
+
+.panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.625rem;
+}
+.panel-title {
+  margin: 0;
+  font-size: var(--text-title);
+  line-height: var(--text-title--line-height);
+  font-weight: 600;
+}
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.5rem;
+  border: 1px dashed var(--color-edge);
+  font-size: var(--text-meta);
+  line-height: 1.5rem;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+.readouts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.375rem 1rem;
+  margin: 0;
+}
+.readouts dt { color: var(--color-ink-muted); }
+.readouts dd { margin: 0; text-align: right; font-weight: 500; }
+
+.pending-note {
+  margin: 0;
+  text-wrap: pretty;
+  max-width: 34rem;
+  color: var(--color-ink-muted);
+}
+
+/* Plotting table: the recessed, dominant surface. */
+.plot-well {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 1rem;
+  background: var(--color-well);
+  box-shadow: inset 0 0 0 1px var(--color-seam), inset 0 0 3rem rgb(0 0 0 / 0.45);
+}
+.plot-caption {
+  position: absolute;
+  top: 0.625rem;
+  left: 0.875rem;
+  margin: 0;
+  font-size: var(--text-meta);
+  color: var(--color-ink-muted);
+}
+.plot-offline {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  max-width: 26rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px dashed var(--color-edge);
+  text-align: center;
+}
+.plot-offline-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-readout);
+  line-height: var(--text-readout--line-height);
+  font-weight: 600;
+}
+
+/* Buttons. Solid edge = available; dashed edge = unavailable (aria-disabled). */
+.console-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--color-edge);
+  background: var(--color-raised);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-quick) ease-out,
+    border-color var(--duration-quick) ease-out,
+    color var(--duration-quick) ease-out;
+}
+.console-button:hover { border-color: var(--color-ink-muted); }
+.console-button svg { width: 1rem; height: 1rem; flex: none; }
+
+.console-button[data-variant="quiet"] { background: transparent; }
+
+.console-button[data-variant="commit"] {
+  width: 100%;
+  min-height: 3.25rem;
+  border: 2px solid var(--color-command);
+  background: var(--color-command);
+  color: var(--color-command-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-readout);
+  font-weight: 600;
+}
+.console-button[data-variant="commit"]:focus-visible { outline-offset: 3px; }
+
+.console-button[aria-disabled="true"] {
+  border-style: dashed;
+  border-color: var(--color-edge);
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+.console-button[data-variant="commit"][aria-disabled="true"] {
+  border-color: var(--color-command);
+  color: var(--color-command);
+}
+
+/* Header details. */
+.ship-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-ship);
+  line-height: var(--text-ship--line-height);
+  font-weight: 600;
+}
+.mission-line { margin: 0; font-size: var(--text-meta); color: var(--color-ink-muted); }
+
+.turn-readout { display: flex; align-items: baseline; gap: 0.5rem; }
+.turn-readout dt { color: var(--color-ink-muted); }
+.turn-readout dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-readout);
+  font-weight: 600;
+}
+
+.phase-track {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.phase-step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.625rem 0.25rem 0.5rem;
+  border-bottom: 2px solid transparent;
+  color: var(--color-ink-muted);
+}
+.phase-step + .phase-step::before {
+  content: "";
+  width: 0.75rem;
+  margin-right: 0.4rem;
+  border-top: 1px solid var(--color-edge);
+}
+.phase-marker {
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1.5px solid var(--color-edge);
+  border-radius: 50%;
+}
+.phase-step[aria-current="step"] {
+  border-bottom-color: var(--color-command);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.phase-step[aria-current="step"] .phase-marker {
+  border-color: var(--color-command);
+  background: var(--color-command);
+}
+
+/* Transport bar under the plot. */
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.625rem 1rem;
+  background: var(--color-bulkhead);
+}
+.transport-buttons { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+.timeline {
+  flex: 1 1 12rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.timeline-track {
+  flex: 1;
+  height: 0;
+  border-top: 2px dashed var(--color-edge);
+}
+.timeline-label { min-width: 0; color: var(--color-ink-muted); }
+
+/* Commit station: the one bold element on the console. */
+.commit-station { padding: 1rem; background: var(--color-bulkhead); }
+/* Keep Commit Turn in view while a rail scrolls; narrow layouts scroll the page instead. */
+@media (min-width: 760px) {
+  .commit-station { position: sticky; bottom: 0; z-index: 1; }
+}
+.commit-note { margin: 0.5rem 0 0; font-size: var(--text-meta); line-height: var(--text-meta--line-height); color: var(--color-ink-muted); }
+
+.event-log { flex: 1 0 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-quick: 0s; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
