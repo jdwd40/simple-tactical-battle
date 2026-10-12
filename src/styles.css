@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+:root {
+  font-family: system-ui, sans-serif;
+  color: #f1f5f9;
+  background: #0b1420;
+  color-scheme: dark;
+}
+body { margin: 0; min-width: 320px; }
+:focus-visible { outline: 3px solid #67e8f9; outline-offset: 5px; }
+.skip-link { position: absolute; top: 1rem; left: 1rem; transform: translateY(-200%); }
+.skip-link:focus { transform: translateY(0); background: #0b1420; padding: 0.5rem; }
