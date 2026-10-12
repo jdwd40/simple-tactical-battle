@@ -1,0 +1,69 @@
+# Development plan
+
+Status: reconciled and approved by the user on 2026-10-12. Implementation is authorised through M3's local release candidate; role readiness and actual deliveries are recorded in the canonical PROJECT_STATUS.md. Existing factory instructions govern dispatch, review and integration.
+
+## Milestones and acceptance
+
+| Milestone | Demonstrable acceptance |
+| --- | --- |
+| M0 — rules, contracts and runnable skeleton | Baseline and contracts agreed; the application launches, the initial scenario loads and a browser smoke test passes. Dev/build/typecheck/lint/unit/browser commands work. This proves scaffolding, not gameplay. Executable work requires implementation approval. |
+| M1 — deterministic foundation | A real headless 100-tick movement turn obeys terrain and observation boundaries and reproduces identical results. The browser plots, commits, plays and assesses that turn. Speed/pause/skip cannot change its outcome; restart clears orders, contacts, replay and renderer objects. |
+| M2A — sensors and stealth, within M2 | Passive sensing, one active pulse, movement/activity signatures, cloak and contact memory work. The player can find, lose and search for contacts; stale markers and replay remain faithful to knowledge at that time. |
+| M2B — combat, within M2 | Scripted duels exercise both weapons, energy/ammunition/cooldowns, shields/hull and all destruction outcomes. Missiles can be evaded, hit obstacles and persist across turns or launcher death. Simultaneous lethal attacks are order-independent. |
+| M2C — complete encounter, completing M2 | The real browser duel runs through an outcome against observation-only PATROL/INVESTIGATE/ENGAGE/SEARCH AI, including survivor evasion while missiles remain. Mission/replay/same-seed restart need no terminal intervention or gameplay mocks. Provide an accessible preview or an explicit access limitation and request human playtest feedback. |
+| M3 — release candidate | Combined checks and a runnable production build pass on the reviewed integrated revision. Actual browser inspection covers readability, accessibility, playback and repeated restarts; bounded headless runs record failures/cutoffs. Verified instructions, artifacts and known limitations are delivered. Technical completion and human gameplay acceptance remain separate. |
+
+## Dependency-ordered tasks
+
+The user's TSB-01 through TSB-52 work packages replace the earlier undispatched TSB-001 through TSB-009 placeholders. This is the sole backlog; no implementation or accepted revision is lost in that reconciliation. First dispatched attempts will be 1. Worktree, branch and exact base/head revisions are assigned at dispatch after repository setup and authorisation.
+
+| ID | Owner | Scope / delivery | Dependencies |
+| --- | --- | --- | --- |
+| TSB-01 | Lead | Inspect context and reconcile the four planning documents and canonical status. | Planning authorised; completed as documentation only |
+| TSB-02 | General Builder | Core types, authored scenario/rules and observer-safe examples from ARCHITECTURE.md; UI checks usability read-only, lead accepts contracts. Verify types and serialization/information boundaries. | Approved baseline; TSB-03A tooling |
+| TSB-03 | Assistant Builder | Single owner of package/lockfiles and root configuration; approved stack, scripts, initial scenario loading, public fixtures and browser smoke harness. Verify commands and actual browser launch. | Approval/repository setup; TSB-02 before scenario/fixture completion |
+| TSB-10 | General Builder | Headless fixed-tick movement, seeded state, deterministic routing/obstacles, observer projection and recorded turns using scripted opponent orders. Own movement/determinism tests. | Accepted M0 |
+| TSB-11 | UI Builder | PixiJS battlefield, course/route preview, phase controls, commit/playback/assessment/restart. Fixtures may unblock presentation, then integrate the real TSB-10 engine. Use frontend-design guidance and browser evidence. | Accepted M0; real integration after TSB-10 |
+| TSB-12 | Assistant Builder | Additional reproducible movement/obstacle/turn-boundary, duplicate-commit and clean-restart regressions. No engine redesign. | TSB-10/11 relevant interfaces integrated |
+| TSB-20 | General Builder | Passive/active sensing, signatures, cloak latch, contact ageing and observer-filtered events; own detection/resource/replay tests. | Accepted M1 |
+| TSB-21 | UI Builder | Sensor/cloak controls, current/stale contact markers, uncertainty, visibility-safe selection and filtered logs. Browser inspection at acquisition/loss. | M1; agreed TSB-20 contracts; real acceptance after TSB-20 |
+| TSB-22 | Assistant Builder | Hidden-state equivalence, pulse/cloak cost and temporal replay boundary regressions, including previews/logs. | TSB-20/21 integrated |
+| TSB-30 | General Builder | Laser and plotted missiles, energy priority, cooldowns, shields/hull, swept impacts, simultaneous destruction and persistent ordnance/outcome rules. Deliver coherent laser/resource then missile/outcome increments with own tests. | Accepted M2A |
+| TSB-31 | UI Builder | Weapon targeting, conditional intent explanations, resources, visible attacks/impacts and failed own-action feedback. No omniscient enemy damage display. | M2A; agreed TSB-30 contracts; real acceptance after TSB-30 |
+| TSB-32 | Assistant Builder | Simultaneous lethal, insufficient-energy, cooldown, late-launch, evasion, obstacle and cross-turn fixtures/regressions. | TSB-30/31 relevant increments integrated |
+| TSB-40 | General Builder | Observation-only PATROL/INVESTIGATE/ENGAGE/SEARCH AI, resource awareness, search/evasion and legal orders. Verify equal observations/memory/RNG give equal choices despite hidden-world changes. | Accepted M2B |
+| TSB-41 | UI Builder | Brief mission introduction, complete live duel, outcome/abandon/restart/same-seed flow and observer-faithful replay. | M2B; real encounter acceptance after TSB-40 |
+| TSB-42 | Assistant Builder | Reproducible browser/headless complete-loop scenarios, including both post-destruction survivor cases. | TSB-40/41 integrated |
+| TSB-50 | UI Builder | Evidence-based readability/polish: battlefield first, restrained vector presentation, laptop layout, focus/keyboard, non-colour cues and reduced motion. Inspect the running UI. | Accepted M2; browser/playtest findings |
+| TSB-51 | General Builder | Reproduce and fix observed balance/AI defects within approved mechanics; record configuration changes and rationale. | Accepted M2; concrete review/batch/playtest findings |
+| TSB-52 | Assistant Builder | Targeted regressions, bounded batch harness, reproducible failure records and verified install/run/test/build/controls documentation. Owner defects return to General/UI. | M2; final verification after TSB-50/51 integrated |
+
+## First small batch after approval
+
+The lead first revalidates panes/files and creates a local Git baseline preserving these documents. Dispatch TSB-03A to the Assistant Builder for tooling/configuration and a minimal launchable shell. After independent acceptance, dispatch TSB-02 to the General Builder; the UI Builder supplies a read-only usability check of its exact proposed contract revision. Then TSB-03B returns to the Assistant for typed fixtures, initial scenario loading and the browser smoke test. TSB-03A/B are increments of TSB-03, not additional milestones. No core types are independently authored by the Assistant.
+
+After M0 acceptance, General TSB-10 and UI TSB-11 presentation against accepted fixtures can run in separate worktrees. A subsequent TSB-11 increment connects the reviewed real engine before M1 acceptance. Further UI work may overlap engine work only against settled contracts; supporting regression tasks follow usable interfaces. Do not occupy agents with speculative assignments or shift builders' own testing to the Assistant.
+
+Each actual handoff supplies task/attempt, confirmed pane, absolute worktree/branch/base, owned files/contracts/exclusions, observable acceptance, required checks and the factory completion-report format. Parallel builders use separate worktrees; reviewers receive immutable base/head snapshots. Review applies only to that revision, with initial review and at most two correction rounds. Integrate accepted work locally and verify the combined candidate before releasing dependent tasks.
+
+Shared contracts/scenario data belong to General; root configuration/lockfile belong to Assistant; application presentation/React/PixiJS belong to UI. Shared amendments and ownership transfers are sequenced by the lead. Assign finite test-server lifetimes and distinct ports at dispatch, and verify browser tests reach the assigned worktree/build. The lead owns combined integration and status, not substantive feature implementation; any lead code changes receive independent review.
+
+Demonstration gates: M0 launches; M1 demonstrates real movement/replay; M2A demonstrates search/concealment; M2B demonstrates scripted combat; M2C demonstrates the complete AI duel and requests human feedback. Preview forwarding/access is not established yet; a server-local URL alone is not a user-accessible demo. Interim scripted policies are labelled unfinished. Public hosting remains separately authorised.
+
+## Verification matrix
+
+Vitest covers determinism from state/rules/seed/orders; reversed entity/effect enumeration; observation-invariant AI and validation; no hidden/future presentation data; own resource/ammo/cooldown invariants; path bounds/corners; swept missile impacts and cross-turn clocks; observed/unobserved destruction without phase/validation leaks, automatic aftermath and all three outcomes. Reset tests ensure no old orders, contacts, clocks or replay survive.
+
+Playwright covers planning → commit → locked execution → assessment/replay → planning and reproducible encounters through an outcome. Repeat one accepted order sequence at different playback speeds/pause/skip patterns and compare simulation results. Seek replay across acquisitions, lost contacts and terminal revelation; capture screenshots/traces for real interface inspection. Test keyboard interaction, visible focus, readable states at 1366×768 and reduced motion. Repeated turns/restarts must not accumulate listeners or renderers. Verify the production build is runnable, not just the dev screen. Canvas-only compilation is insufficient.
+
+Start with focused deterministic scenarios, then a modest run of up to 50 seeds using observation-only AI and simple player policies: conceal/search, repeated scan, pursuit/laser, and leading missiles. Use a documented 200-turn diagnostic limit; save seed/rules/orders/revision for crashes, invalid resources, idle loops or exploitable strategies. Expand only to investigate evidence. A cutoff is a diagnostic, never a gameplay draw. Win rates guide investigation but cannot establish enjoyment or balance.
+
+Human playtest checklist at M2C: can the player explain orders and consequences; does scanning versus concealment matter; does prediction help attacks/escape; is uncertainty intriguing rather than confusing; can a loss be explained from visible information? Record who tested and what was observed. Continue authorised fixes/checks while awaiting feedback, keep human acceptance separate from technical completion and do not invent manual checks.
+
+## Policy and material decisions
+
+Primary risks are hidden/future information entering UI or AI payloads, ordering errors in simultaneous damage/sweeps, and tactically dominant resource or weapon values. Contract isolation and adversarial tests address the first two; repeatable policy runs plus early human playtesting address the third. Browser/PixiJS lifecycle and laptop readability require running-interface inspection. Missing reviewer setup blocks independent acceptance, not completion of this planning draft.
+
+The user approved the plan and automated implementation on 2026-10-12. Local worker commits and integration candidates follow the factory process. Merge into a release/default branch, remote pushes and public deployment remain unauthorised; stop at a reviewed, tested local candidate and production build. Record IMPLEMENTED, REVIEWED, INTEGRATED, READY_TO_MERGE and DEPLOYED separately.
+
+Approved baseline: one first-tick active pulse, successful scan/fire keeping cloak off until a later planning phase, 100ms simultaneous effect batches, one conditional shot, non-homing plotted missiles, no shield regeneration and evasive turns for either survivor before missile-safe finalisation. Numerical values are tuning hypotheses. Routine code structure, fixtures and configuration tuning within approved mechanics belong to the lead; material behaviour/architecture/cost/scope changes return to the user.
