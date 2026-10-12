@@ -130,3 +130,13 @@ test('respects reduced-motion preferences for control transitions', async ({ pag
   await page.emulateMedia({ reducedMotion: 'reduce' })
   expect((await commitTransition()).split(', ').every((duration) => duration === '0s')).toBe(true)
 })
+
+test('serves the font licence as plain text rather than the application page', async ({ request }) => {
+  const response = await request.get('/assets/barlow-fonts-OFL.txt')
+  expect(response.status()).toBe(200)
+  expect(response.headers()['content-type']).toMatch(/^text\/plain/)
+  const body = await response.text()
+  expect(body).toContain('Copyright 2017 The Barlow Project Authors')
+  expect(body).toContain('SIL OPEN FONT LICENSE Version 1.1')
+  expect(body).not.toContain('<div id="root">')
+})

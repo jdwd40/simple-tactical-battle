@@ -13,6 +13,11 @@
  * dashed = not live (stale contact, unavailable control, pending system).
  */
 
+/*
+ * Barlow fonts (src/ui/fonts) are SIL OFL 1.1. Their copyright notice and full
+ * licence live in public/assets/barlow-fonts-OFL.txt, which Vite copies verbatim
+ * into dist/assets beside the emitted font files.
+ */
 @font-face {
   font-family: "Barlow Semi Condensed";
   font-style: normal;
