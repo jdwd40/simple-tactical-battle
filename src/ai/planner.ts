@@ -5,7 +5,7 @@ import { cellCentre } from '../contracts'
 import { best, cellAt, chebyshev, clampToMap, distance, isOpen, reachableCells, sameCell, segmentClear } from './navigation'
 import { randomStream } from './random'
 
-/** Behaviour thresholds: planner hypotheses within the approved rules, tunable later (TSB-51). */
+/** Behaviour thresholds: planner hypotheses within the approved rules; TSB-51 kept every value (src/ai/README.md). */
 export const PLANNER_TUNING = Object.freeze({
   /** Energy kept after any discharge or scan so propulsion stays funded. */
   reserveMilli: 20_000,
