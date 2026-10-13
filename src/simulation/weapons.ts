@@ -1,5 +1,6 @@
-import type { PrivateKnowledge, ShipState } from '../contracts/private'
+import type { MissileState, PrivateKnowledge, ShipState } from '../contracts/private'
 import type { Outcome, PublicMap, Ruleset, Side, Tick, UnfiredReason } from '../contracts/public'
+import { cellCentre } from '../scenarios/geometry'
 import { hasLineOfSight, withinRange } from './geometry'
 
 /** Canonical reporting order for unfired reasons; never an evaluation priority. */
@@ -13,8 +14,9 @@ export function withActivity(ship: ShipState, now: Tick, rules: Ruleset): ShipSt
   }
 }
 
-export type LaserProposal =
-  | { readonly fire: true; readonly target: ShipState }
+export type WeaponProposal =
+  | { readonly fire: true; readonly weapon: 'laser'; readonly target: ShipState }
+  | { readonly fire: true; readonly weapon: 'missile' }
   | { readonly fire: false; readonly reasons: readonly UnfiredReason[] }
 
 /**
@@ -24,7 +26,7 @@ export type LaserProposal =
  */
 export function proposeLaser(
   shooter: ShipState, knowledge: PrivateKnowledge, freshTargets: readonly ShipState[], now: Tick, rules: Ruleset, map: PublicMap,
-): LaserProposal | null {
+): WeaponProposal | null {
   const weapon = shooter.orders?.weapon
   if (!shooter.alive || weapon?.kind !== 'laser' || shooter.weaponIntentSpent) return null
   const entityId = knowledge.contacts.find(({ contact }) => contact.alias === weapon.contactAlias)?.entityId
@@ -38,7 +40,39 @@ export function proposeLaser(
   if (shooter.laserReadyTick > now) reasons.push('cooldown')
   // Weapon energy is what remains after the stage-2 grants (regen → cloak → pulse → propulsion).
   if (shooter.energyMilli < rules.laser.costMilli) reasons.push('insufficient-energy')
-  return target !== undefined && reasons.length === 0 ? { fire: true, target } : { fire: false, reasons }
+  return target !== undefined && reasons.length === 0 ? { fire: true, weapon: 'laser', target } : { fire: false, reasons }
+}
+
+/**
+ * Stage 5 for one unspent missile intent: a plotted cell needs no lock, range or sightline, only
+ * the absolute cooldown and the energy left after the stage-2 grants. Ammunition was checked at commit.
+ */
+export function proposeMissile(shooter: ShipState, now: Tick, rules: Ruleset): WeaponProposal | null {
+  if (!shooter.alive || shooter.orders?.weapon.kind !== 'missile' || shooter.weaponIntentSpent) return null
+  const reasons: UnfiredReason[] = []
+  if (shooter.missileReadyTick > now) reasons.push('cooldown')
+  if (shooter.energyMilli < rules.missile.costMilli) reasons.push('insufficient-energy')
+  return reasons.length === 0 ? { fire: true, weapon: 'missile' } : { fire: false, reasons }
+}
+
+/** Collected stage-5 launch: cost, one round, spent intent, cooldown, activity; travel begins next tick. */
+export function launchMissile(ship: ShipState, now: Tick, rules: Ruleset): { readonly ship: ShipState; readonly missile: MissileState } {
+  const weapon = ship.orders?.weapon
+  if (weapon?.kind !== 'missile' || ship.ammunition <= 0) throw new Error(`${ship.side} cannot launch without a committed missile and ammunition`)
+  const position = { x: ship.position.x, y: ship.position.y }
+  const missile: MissileState = {
+    id: `${ship.side}-missile-${rules.ships[ship.shipClass].missileAmmunition - ship.ammunition + 1}`,
+    launcherEntityId: ship.entityId, launcherSide: ship.side, position, aim: { column: weapon.aim.column, row: weapon.aim.row },
+    aimPosition: cellCentre(weapon.aim, rules), launchPosition: { ...position }, distanceTravelledUnits: 0,
+    launchTick: now, expiresAtTick: now + rules.timing.missileLifetimeTicks,
+  }
+  return {
+    ship: {
+      ...withActivity(ship, now, rules), energyMilli: ship.energyMilli - rules.missile.costMilli, ammunition: ship.ammunition - 1,
+      weaponIntentSpent: true, missileReadyTick: now + rules.timing.missileCooldownTicks,
+    },
+    missile,
+  }
 }
 
 /** Collected stage-5 consequences of one discharge: cost, spent intent, cooldown, exposure and cloak latch. */

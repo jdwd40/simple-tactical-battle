@@ -2,6 +2,7 @@ import type {
   OrderValidation, OwnShipObservation, RouteProgress, Ruleset, Tick, ValidateOrders, ValidationField, ValidationIssue,
 } from '../contracts/public'
 import { freezeData } from '../scenarios/freeze'
+import { isMapCell } from '../scenarios/geometry'
 import { planMovement } from './route'
 import { hasLineOfSight, withinRange } from './geometry'
 import { fundTick } from './sensing'
@@ -10,7 +11,7 @@ import { fundTick } from './sensing'
  * Engine capabilities of this increment. Equipped but unimplemented intents are rejected
  * as `equipment-unavailable` rather than accepted and silently not performed.
  */
-export const ENGINE_CAPABILITIES = freezeData({ activePulse: true, laser: true, missile: false })
+export const ENGINE_CAPABILITIES = freezeData({ activePulse: true, laser: true, missile: true })
 
 type ErrorCode = Extract<ValidationIssue, { readonly severity: 'error' }>['code']
 function error(field: ValidationField, code: ErrorCode, details?: ValidationIssue['details']): ValidationIssue {
@@ -103,11 +104,17 @@ export const validateOrders: ValidateOrders = (orders, observation, rules) => {
     && observation.observedOpponentDestructionTick === undefined ? orders.weapon : null
   const contact = laser === null ? undefined : observation.contacts.find((candidate) => candidate.alias === laser.contactAlias)
   if (laser !== null && contact === undefined) issues.push(error('weapon', 'unknown-alias', { contactAlias: laser.contactAlias }))
+  // A missile names only a plotted map cell; it never reads a contact or rewrites its aim.
+  const missile = orders.weapon.kind === 'missile' && own.equipment.missileLauncher && ENGINE_CAPABILITIES.missile
+    && observation.observedOpponentDestructionTick === undefined ? orders.weapon : null
+  if (missile !== null && !isMapCell(missile.aim, observation.map)) issues.push(error('weapon', 'out-of-bounds', { cell: { column: missile.aim.column, row: missile.aim.row } }))
+  if (missile !== null && own.ammunition.current <= 0) issues.push(error('weapon', 'no-ammunition'))
+  const launchable = missile !== null && isMapCell(missile.aim, observation.map) && own.ammunition.current > 0
   const cloak = orders.cloak && own.equipment.cloak
   if (cloak && own.clocks.exposureUntilTick > observation.tick + 1) {
     issues.push({ field: 'cloak', severity: 'conditional', code: 'cloak-exposure', details: { readyTick: own.clocks.exposureUntilTick } })
   }
-  if (cloak && ((pulse && pulseAvailable) || contact !== undefined)) issues.push({ field: 'cloak', severity: 'warning', code: 'activity-breaks-cloak' })
+  if (cloak && ((pulse && pulseAvailable) || contact !== undefined || launchable)) issues.push({ field: 'cloak', severity: 'warning', code: 'activity-breaks-cloak' })
   // The pulse precedes propulsion, so an invalid destination does not change its forecast.
   const forecast = forecastFunding(own, 'error' in plan ? own.route : plan.route, cloak, pulse && pulseAvailable, observation.tick, rules)
   if (forecast.pulseShortfall !== null) {
@@ -128,6 +135,17 @@ export const validateOrders: ValidateOrders = (orders, observation, rules) => {
     if (own.clocks.laserReadyTick > observation.tick + 1) conditional('awaiting-cooldown', { readyTick: own.clocks.laserReadyTick })
     if (forecast.firstTickWeaponEnergyMilli < rules.laser.costMilli) {
       conditional('awaiting-energy', { requiredEnergyMilli: rules.laser.costMilli, availableEnergyMilli: forecast.firstTickWeaponEnergyMilli })
+    }
+  }
+  if (launchable) {
+    if (own.clocks.missileReadyTick > observation.tick + 1) {
+      issues.push({ field: 'weapon', severity: 'conditional', code: 'awaiting-cooldown', details: { readyTick: own.clocks.missileReadyTick } })
+    }
+    if (forecast.firstTickWeaponEnergyMilli < rules.missile.costMilli) {
+      issues.push({
+        field: 'weapon', severity: 'conditional', code: 'awaiting-energy',
+        details: { requiredEnergyMilli: rules.missile.costMilli, availableEnergyMilli: forecast.firstTickWeaponEnergyMilli },
+      })
     }
   }
   if (!('error' in plan) && forecast.propulsionPauses) {

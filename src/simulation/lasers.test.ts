@@ -39,7 +39,7 @@ const shots = (result: TurnResolution) => result.internalEvents.filter((event) =
 describe('conditional once-only laser', () => {
   it('fires once at the first eligible tick with cost, cooldown, exposure and cloak latch; the emission reveals the shooter', () => {
     const s1 = engaged(orders(0, null, true))
-    expect(ENGINE_CAPABILITIES).toEqual({ activePulse: true, laser: true, missile: false })
+    expect(ENGINE_CAPABILITIES).toEqual({ activePulse: true, laser: true, missile: true })
     expect(s1.ships.player.energyMilli).toBe(89_800)
     const draft = laser(orders(1, null, true))
     expect(issueCodes(s1, 'player', draft)).toEqual(['cloak:warning:activity-breaks-cloak'])

@@ -44,12 +44,12 @@ export type ContactEvent =
   | { readonly kind: 'contact-acquired' | 'contact-lost'; readonly contact: ContactMemory }
   | { readonly kind: 'contact-expired'; readonly alias: string }
 
-/** Public maximum speed growth, capped where the circle already covers the whole map. */
-function uncertaintyUnits(at: Position, ageTicks: number, rules: Ruleset, map: PublicMap): number {
+/** Growth at a public speed, capped where the circle already covers the whole map. */
+export function uncertaintyUnits(at: Position, ageTicks: number, speedUnitsPerTick: number, rules: Ruleset, map: PublicMap): number {
   const units = rules.geometry.unitsPerCell
   const dx = Math.max(at.x, map.columns * units - at.x)
   const dy = Math.max(at.y, map.rows * units - at.y)
-  return Math.min(ageTicks * rules.maxShipSpeedUnitsPerTick, ceilSqrt(dx * dx + dy * dy))
+  return Math.min(ageTicks * speedUnitsPerTick, ceilSqrt(dx * dx + dy * dy))
 }
 function currentContact(alias: string, position: Position, now: Tick, previous?: ContactMemory): ContactMemory {
   const measurement = { position: { x: position.x, y: position.y }, tick: now }
@@ -96,7 +96,7 @@ export function updateContacts(
       ...(previous.previousMeasurement === undefined ? {} : { previousMeasurement: previous.previousMeasurement }),
       ...(previous.estimatedVelocity === undefined ? {} : { estimatedVelocity: previous.estimatedVelocity }),
       ...(previous.observedDestructionTick === undefined ? {} : { observedDestructionTick: previous.observedDestructionTick }),
-      kind: 'stale', ageTicks, uncertaintyRadiusUnits: uncertaintyUnits(previous.measurement.position, ageTicks, rules, map),
+      kind: 'stale', ageTicks, uncertaintyRadiusUnits: uncertaintyUnits(previous.measurement.position, ageTicks, rules.maxShipSpeedUnitsPerTick, rules, map),
     }
     contacts.push({ entityId, contact })
     if (previous.kind === 'current') events.push({ kind: 'contact-lost', contact })

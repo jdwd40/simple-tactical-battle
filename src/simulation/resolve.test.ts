@@ -179,8 +179,8 @@ describe('locked input checks', () => {
     expect(() => resolveTurn(s0, lock(s0, orders(0, null), orders(0, null, true)), DUEL_RULES, DUEL_SCENARIO)).toThrow('cloak:equipment-unavailable')
     const laser = { ...orders(0, null), weapon: { kind: 'laser' as const, contactAlias: 'contact-1' } }
     expect(() => resolveTurn(s0, lock(s0, laser, orders(0, null)), DUEL_RULES, DUEL_SCENARIO)).toThrow('weapon:unknown-alias')
-    const missile = { ...orders(0, null), weapon: { kind: 'missile' as const, aim: { column: 10, row: 10 } } }
-    expect(() => resolveTurn(s0, lock(s0, orders(0, null), missile), DUEL_RULES, DUEL_SCENARIO)).toThrow('weapon:equipment-unavailable')
+    const missile = { ...orders(0, null), weapon: { kind: 'missile' as const, aim: { column: 20, row: 10 } } }
+    expect(() => resolveTurn(s0, lock(s0, orders(0, null), missile), DUEL_RULES, DUEL_SCENARIO)).toThrow('weapon:out-of-bounds')
     const otherRules = createRuleset({ ...DUEL_CONFIG, version: 'other' })
     expect(() => resolveTurn(s0, lock(s0, orders(0, null), orders(0, null)), otherRules, DUEL_SCENARIO)).toThrow('do not match')
   })
