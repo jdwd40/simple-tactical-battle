@@ -22,9 +22,9 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | --- | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
 | General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | Available; TSB-20 /1 PASS/integrated |
-| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-21 /1 resumed on accepted20; final real-engine/browser verification |
-| Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | TSB-22 /1 active; bounded public information/replay regressions |
-| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | Available; REVIEW-TSB-20 /1/round0 PASS |
+| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-21 /1 delivered; available pending review findings |
+| Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | TSB-22 /1 delivered; available pending review |
+| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | REVIEW-TSB-21 /1/round0 active;22 queued afterward |
 
 Earlier outages: Herdr stopped at 22:58:38 UTC Oct12 and 05:21 UTC Oct13. User established kernel OOM killed headless Chrome, then systemd OOMPolicy=stop ended the scope. User added 4G swap and moved Herdr to herdr.service with OOMPolicy=continue; infrastructure investigation ended. General moved p3→p8 and Assistant p6→p9; original sessions restored, existing /home/jd trust confirmations explicitly authorised and cleared. Reviewer/Assistant native resume had lost their original full-access policy; the same UUIDs were resumed with their recorded original permissions, without model changes. Reviewer browser access subsequently passed. Interrupted REVIEW-TSB-11B /2/round1 was re-run and accepted. No current recovery blocker.
 
@@ -46,8 +46,8 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-11C UI /1→2 | ui-11c / tsb/11c-playable / f4d77dc649497be98d63de63da4d06dd5e123be7 |0f8378d7 round0 CHANGES_REQUIRED3medium; corrected06601d1eca25977364e343a901984ae6d349f844 round1 PASS;163unit/23browser/build/type/lint/production independentlypass; integrated e33d043/fbea50e; combined 163unit/23browser/build/type/lint PASS |
 | TSB-12B Assistant /1 | assistant-12b / tsb/12b-lifecycle / fbea50ed56d6809fd06a91fd1343bb0a38016981 |1f70d8c0972ae0856c462768c3135ce912bb542b; round0 PASS; integrated850d987; combined166unit/24browser/build/type/lint PASS |
 | TSB-20 General /1 | general-20 / tsb/20-sensors / 850d98787ccd6fa32a2bc15bc481a2b976f29430 |85c8c510dec194e3807a8efcfaf3b474915c7281; round0 PASS; integrated7a3c343; combined180unit/build/type/lint pass;6835 independent assertions/23turns/3tick sizes |
-| TSB-21 UI /1 | ui-21 / tsb/21-sensors / original850d987; reviewbase7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 | Checkpoint1b4b33c03337b8a019097ba3ee7f8d8728d884aa→rebased53d8a4a6dff567469b2455cce63a828438233ce8 on accepted20; resumed finalverification; no initialreview yet |
-| TSB-22 Assistant /1 | assistant-22 / tsb/22-information / 7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 | ACTIVE; new headless public-controller/replay/hidden-equivalence regressions; final M2A browser gate waits21 |
+| TSB-21 UI /1 | ui-21 / tsb/21-sensors / original850d987; reviewbase7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 | Checkpoint1b4b33c→rebased53d8a4a; finaldd1f31ad407448f7da4cb0a3e8a48c0f463d7ca5 delivered208unit/24files,27browser,build/type/lint/production pass; round0 active reviews/21-r0 |
+| TSB-22 Assistant /1 | assistant-22 / tsb/22-information / 7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 | Deliverede3eff4dba432e98212c8cf08a62f257c28b6880f;4focused/184fullunit/23files/build/type/lint pass; review queued in reviews/22-r0 after21 |
 
 Original assignments, reports and review verdicts: handoffs/. Exact detached snapshots: reviews/<task>-r<round>; Git worktree list records retained heads. TSB-11C report-a2/review-r1 documents the three corrected blockers: nested view immutability, re-entrant restart/abandon during commit, and blank grid fields after restart. No further review of that accepted change is pending.
 
