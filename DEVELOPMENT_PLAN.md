@@ -38,6 +38,8 @@ The user's TSB-01 through TSB-52 work packages replace the earlier undispatched 
 | TSB-51 | General Builder | Reproduce and fix observed balance/AI defects within approved mechanics; record configuration changes and rationale. | Accepted M2; concrete review/batch/playtest findings |
 | TSB-52 | Assistant Builder | Targeted regressions, bounded batch harness, reproducible failure records and verified install/run/test/build/controls documentation. Owner defects return to General/UI. | M2; final verification after TSB-50/51 integrated |
 
+TSB-30 is delivered as30A (conditional lasers/shared resources/damage and laser-only outcomes), then30B (plotted missiles, swept impacts, persistence and full ending/aftermath rules). Each receives independent review before integration. TSB-31 remains one UI/application assignment, pausing at clean checkpoints for lead-controlled accepted engine handoffs; its final acceptance uses30B. This refines the existing work package without adding scope.
+
 ## First small batch after approval
 
 The lead first revalidates panes/files and creates a local Git baseline preserving these documents. Dispatch TSB-03A to the Assistant Builder for tooling/configuration and a minimal launchable shell. After independent acceptance, dispatch TSB-02 to its recorded single owner (Assistant attempt 2 fallback for concrete typing after General attempt 1 stalled without source changes); the UI Builder supplies a read-only usability check of its exact proposed contract revision. Then TSB-03B returns to the Assistant for typed fixtures, initial scenario loading and the browser smoke test. TSB-03A/B are increments of TSB-03, not additional milestones. No core types are independently authored by the Assistant.

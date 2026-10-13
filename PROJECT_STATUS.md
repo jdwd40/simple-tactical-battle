@@ -6,13 +6,15 @@ Canonical: /home/jd/projects/tactical-space-battle/PROJECT_STATUS.md. Sole write
 
 The user approved automated implementation through M3's local release candidate on 2026-10-12: "plan is aproved. All systems go. Run automated as much as possible from now on". Local commits, integration, tests and corrections are authorised. No default/release-branch merge, remote push or public deployment is authorised.
 
-Repository /home/jd/projects/tactical-space-battle, local branch tsb/integration, no remote. Accepted source a3beb004b1937677bd250b54e35b8c3a9404396e; documentation checkpoints follow in Git. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e.
+Repository /home/jd/projects/tactical-space-battle, local branch tsb/integration, no remote. Accepted source c279edbd3c9c945a3bbbd472a895379dd5f22dae; documentation checkpoints follow in Git. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e.
 
 M0 COMPLETE: approved rules/contracts, runnable scaffold, public initial scenario and reviewed console. Combined build/typecheck/lint, 57 unit tests and 7 Chromium tests passed at b71fe73. This was startup, not gameplay.
 
 M1 COMPLETE: real headless movement engine, PixiJS plot, application controller and complementary lifecycle regressions REVIEWED and INTEGRATED. Combined 850d987 build/typecheck/lint, 166 unit tests / 21 files and 24 Chromium tests passed on 2026-10-13 (browser4391, one worker/no reuse). Plot/commit/genuine 100-tick movement/playback/assessment, complete-result playback independence and fresh restart with cleared acquired/lost contact history verified. Prior fbea50e combined163unit/23browser also passed and was recovered after interruption without duplication.
 
-Current M2A: sensors/stealth20 and real information-aware UI21 independently PASS/integrated7a3c343 and0d7b945/a3beb00. Combined build/type/lint/208unit pass. Reviewer21 independently passed208unit/27browser and production scan/replay/restart, keyboard/reduced-motion and contact inspection. Assistant22 four complementary publication tests delivered; independent review active. Final M2A gate awaits22 correction/review and combined browser checks; reviewed sensor-code preview is available. Combat, reactive AI and complete-duel outcomes remain M2B/C, followed by M3 release checks.
+M2A COMPLETE atc279edb: sensors/stealth20, real UI21 and information regressions22 REVIEWED/INTEGRATED. Combined build/typecheck/lint,215unit/25files and27Chromium tests at4391 passed. Reviewer21 also verified production scan/replay/restart, keyboard/reduced motion and contact selection/expiry;22/r1 confirmed strict nested future-payload audit and negative controls. Reviewed sensor-code preview is available (artifact sourcea3beb00, runtime unchanged by22 test-only additions).
+
+Current M2B acceptance: both weapons/resources, shield/hull damage, swept projectile/obstacle behavior, cross-turn/launcher-death persistence, simultaneous destruction and safe outcomes. General30A lasers/shared damage is active, then30B missiles/full persistence/aftermath. UI31 combat interaction/application lifecycle proceeds against settled contracts, with a clean checkpoint before lead brings accepted engine increments.32 follows relevant integration. Reactive AI/mission completion remain M2C; then M3 release checks.
 
 ## Confirmed factory mapping and recovery
 
@@ -21,10 +23,10 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | Role | Confirmed pane / tab | Original session | State |
 | --- | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
-| General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | Available; TSB-20 /1 PASS/integrated |
-| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | Available; TSB-21 /1 PASS/integrated |
-| Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | TSB-22 /2 delivered; available pending findings |
-| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | REVIEW-TSB-22 /2/round1 active;21 PASS preserved |
+| General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | TSB-30A /1 active |
+| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-31 /1 active; checkpoint before engine30 handoff |
+| Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | Available;22 accepted,32 follows combat increments |
+| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | Available;22 /2/round1 PASS |
 
 Earlier outages: Herdr stopped at 22:58:38 UTC Oct12 and 05:21 UTC Oct13. User established kernel OOM killed headless Chrome, then systemd OOMPolicy=stop ended the scope. User added 4G swap and moved Herdr to herdr.service with OOMPolicy=continue; infrastructure investigation ended. General moved p3→p8 and Assistant p6→p9; original sessions restored, existing /home/jd trust confirmations explicitly authorised and cleared. Reviewer/Assistant native resume had lost their original full-access policy; the same UUIDs were resumed with their recorded original permissions, without model changes. Reviewer browser access subsequently passed. Interrupted REVIEW-TSB-11B /2/round1 was re-run and accepted. No current recovery blocker.
 
@@ -47,7 +49,9 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-12B Assistant /1 | assistant-12b / tsb/12b-lifecycle / fbea50ed56d6809fd06a91fd1343bb0a38016981 |1f70d8c0972ae0856c462768c3135ce912bb542b; round0 PASS; integrated850d987; combined166unit/24browser/build/type/lint PASS |
 | TSB-20 General /1 | general-20 / tsb/20-sensors / 850d98787ccd6fa32a2bc15bc481a2b976f29430 |85c8c510dec194e3807a8efcfaf3b474915c7281; round0 PASS; integrated7a3c343; combined180unit/build/type/lint pass;6835 independent assertions/23turns/3tick sizes |
 | TSB-21 UI /1 | ui-21 / tsb/21-sensors / original850d987; reviewbase7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 | Checkpoint1b4b33c→rebased53d8a4a; finaldd1f31ad407448f7da4cb0a3e8a48c0f463d7ca5 round0 PASS; integrated0d7b945/a3beb00;208unit/27browser/production independentlypass; combined208unit/build/type/lint pass |
-| TSB-22 Assistant /1→2 | assistant-22 / tsb/22-information / 7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 |e3eff4d round0 CHANGES_REQUIRED (nested future payload audit, no production leak); fixed6332e686fb1891b2fe8d9375d96c00a9503a9e0c delivered7focused/187fullunit/build/type/lint and expected-failure probes; round1 active reviews/22-r1 |
+| TSB-22 Assistant /1→2 | assistant-22 / tsb/22-information / 7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 |e3eff4d round0 CHANGES_REQUIRED (test audit gap, no production leak); fixed6332e686fb1891b2fe8d9375d96c00a9503a9e0c round1 PASS; integrateda4b9f33/c279edb; combined215unit/27browser/build/type/lint pass |
+| TSB-30A General /1 | general-30a / tsb/30a-lasers / c279edbd3c9c945a3bbbd472a895379dd5f22dae | ACTIVE; first laser/shared damage increment of30, missiles30B follow accepted delivery; handoff30A-a1.md |
+| TSB-31 UI /1 | ui-31 / tsb/31-combat-ui / c279edbd3c9c945a3bbbd472a895379dd5f22dae | ACTIVE; weapons/feedback/application endings+automatic windows; finalrealverification waits accepted30B; handoff31-a1.md |
 
 Original assignments, reports and review verdicts: handoffs/. Exact detached snapshots: reviews/<task>-r<round>; Git worktree list records retained heads. TSB-11C report-a2/review-r1 documents the three corrected blockers: nested view immutability, re-entrant restart/abandon during commit, and blank grid fields after restart. No further review of that accepted change is pending.
 
@@ -69,6 +73,6 @@ Access requires the user's Tailnet or SSH forwarding; server-local reachability 
 
 Approved mechanics and numerical tuning hypotheses remain unchanged. Accepted refinements: stable getView/subscribe, encounter/revision identity, own route preview, cursor-prefix-only replay, controller-owned presentation clock, replay origin without future outcome, tick-only events with deduplicated prefixes. Latest player turn plus automatic aftermath is replay scope. See contracts/README.md and handoffs/TSB-02-ui-decisions.md.
 
-Next: collect/review exact Assistant22 and UI21 final deliveries, integrate accepted changes and verify combined sensor interface; update private preview at M2A. Continue30/31/32,40/41/42 and50/51/52 through the authorised release candidate. No implementation blocker or new approval needed within this scope. Model-capacity interruption delayed lead reporting; original combined M1 job completed successfully and existing worker sessions/assignments were preserved.
+Next: collect/review exact30A, integrate and release30B; coordinate UI31 clean dependency handoff and real engine checks. Release32 after relevant combat interfaces, then40/41/42 and50/51/52 through the authorised release candidate. No current blocker/new approval needed. Original sessions and assignments preserved; completed work not duplicated. The sole backlog remains DEVELOPMENT_PLAN.md.
 
-State: IMPLEMENTED / REVIEWED / INTEGRATED M0 and M1. M2A active. READY_TO_MERGE no; DEPLOYED no. At the complete-duel checkpoint request human playtest feedback and keep it separate from technical completion. Do not add expansion features.
+State: IMPLEMENTED / REVIEWED / INTEGRATED M0,M1,M2A. M2B active. READY_TO_MERGE no; DEPLOYED no. At the complete-duel checkpoint request human playtest feedback and keep it separate from technical completion. Do not add expansion features.
