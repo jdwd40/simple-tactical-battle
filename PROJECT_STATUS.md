@@ -23,10 +23,10 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | Role | Confirmed pane / tab | Original session | State |
 | --- | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
-| General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | TSB-30A /1 active |
+| General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | TSB-30A /1 delivered; available pending findings |
 | UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-31 /1 active; checkpoint before engine30 handoff |
 | Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | Available;22 accepted,32 follows combat increments |
-| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | Available;22 /2/round1 PASS |
+| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | REVIEW-TSB-30A /1/round0 active |
 
 Earlier outages: Herdr stopped at 22:58:38 UTC Oct12 and 05:21 UTC Oct13. User established kernel OOM killed headless Chrome, then systemd OOMPolicy=stop ended the scope. User added 4G swap and moved Herdr to herdr.service with OOMPolicy=continue; infrastructure investigation ended. General moved p3→p8 and Assistant p6→p9; original sessions restored, existing /home/jd trust confirmations explicitly authorised and cleared. Reviewer/Assistant native resume had lost their original full-access policy; the same UUIDs were resumed with their recorded original permissions, without model changes. Reviewer browser access subsequently passed. Interrupted REVIEW-TSB-11B /2/round1 was re-run and accepted. No current recovery blocker.
 
@@ -50,7 +50,7 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-20 General /1 | general-20 / tsb/20-sensors / 850d98787ccd6fa32a2bc15bc481a2b976f29430 |85c8c510dec194e3807a8efcfaf3b474915c7281; round0 PASS; integrated7a3c343; combined180unit/build/type/lint pass;6835 independent assertions/23turns/3tick sizes |
 | TSB-21 UI /1 | ui-21 / tsb/21-sensors / original850d987; reviewbase7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 | Checkpoint1b4b33c→rebased53d8a4a; finaldd1f31ad407448f7da4cb0a3e8a48c0f463d7ca5 round0 PASS; integrated0d7b945/a3beb00;208unit/27browser/production independentlypass; combined208unit/build/type/lint pass |
 | TSB-22 Assistant /1→2 | assistant-22 / tsb/22-information / 7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 |e3eff4d round0 CHANGES_REQUIRED (test audit gap, no production leak); fixed6332e686fb1891b2fe8d9375d96c00a9503a9e0c round1 PASS; integrateda4b9f33/c279edb; combined215unit/27browser/build/type/lint pass |
-| TSB-30A General /1 | general-30a / tsb/30a-lasers / c279edbd3c9c945a3bbbd472a895379dd5f22dae | ACTIVE; first laser/shared damage increment of30, missiles30B follow accepted delivery; handoff30A-a1.md |
+| TSB-30A General /1 | general-30a / tsb/30a-lasers / c279edbd3c9c945a3bbbd472a895379dd5f22dae | Deliveredd3e526eb4b0b6fed227cc799b5bc7e22614357d8 (engine0dfdbcb+docs);226unit/26files/build/type/lint pass; round0 active reviews/30a-r0; missile30B follows acceptance |
 | TSB-31 UI /1 | ui-31 / tsb/31-combat-ui / c279edbd3c9c945a3bbbd472a895379dd5f22dae | ACTIVE; weapons/feedback/application endings+automatic windows; finalrealverification waits accepted30B; handoff31-a1.md |
 
 Original assignments, reports and review verdicts: handoffs/. Exact detached snapshots: reviews/<task>-r<round>; Git worktree list records retained heads. TSB-11C report-a2/review-r1 documents the three corrected blockers: nested view immutability, re-entrant restart/abandon during commit, and blank grid fields after restart. No further review of that accepted change is pending.
