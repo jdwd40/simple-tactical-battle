@@ -70,6 +70,7 @@ function withReproduction(context: Context, orders: TurnOrders, check: () => voi
 const PRIVATE_KEYS = new Set(['entityId', 'sourceEntityId', 'targetEntityId', 'launcherEntityId', 'orders', 'seed', 'random', 'plannerMemory', 'knowledge', 'internalEvents', 'presentations', 'nextState', 'acceptedTurns', 'terminalPending', 'spawns', 'cloakLatch', 'cloakActive', 'cloakRequested', 'enemy', 'opponent'])
 const OBSERVATION_KEYS = ['side', 'turnIndex', 'tick', 'map', 'ownShip', 'contacts', 'ownMissiles', 'hostileMissiles', 'events', 'observedOpponentDestructionTick', 'outcome']
 const OWN_SHIP_KEYS = ['shipClass', 'name', 'status', 'position', 'headingMilliDegrees', 'hull', 'shields', 'energy', 'ammunition', 'equipment', 'destination', 'route', 'cloak', 'sensor', 'clocks', 'turnActions', 'interruptions']
+const REPLAY_KEYS = ['scope', 'startTick', 'endTick', 'cursorTick', 'frames', 'events', 'playback']
 const ROOT_KEYS: Record<GameView['phase'], readonly string[]> = {
   planning: ['encounterId', 'revision', 'rules', 'frame', 'phase', 'draft', 'validation', 'routePreview', 'replay'],
   commit: ['encounterId', 'revision', 'rules', 'frame', 'phase', 'lockedOwnOrders', 'replay'],
@@ -110,15 +111,23 @@ function checkPublicView(view: GameView, auditedObjects: Set<object>, auditedFra
     }
   }
   checkFrame(view.frame)
-  if (view.phase === 'execution' || view.phase === 'assessment') {
+  // Validate each replay container even when it reuses already audited frozen frames.
+  if (view.replay !== null) {
     const { replay } = view
+    expect(Object.keys(replay).sort(), 'Replay fields must match the public prefix contract').toEqual([...REPLAY_KEYS].sort())
+    expect(Object.keys(replay.playback).sort(), 'Replay playback fields must match the public contract').toEqual(['playing', 'speed'])
+    expect(replay.scope).toBe('latest-player-turn-with-aftermath')
+    for (const tick of [replay.startTick, replay.cursorTick, replay.endTick]) expect(Number.isInteger(tick)).toBe(true)
+    expect(replay.startTick).toBeGreaterThanOrEqual(0)
+    expect(replay.cursorTick).toBeGreaterThanOrEqual(replay.startTick)
+    expect(replay.cursorTick).toBeLessThanOrEqual(replay.endTick)
     expect(view.frame.tick).toBe(replay.cursorTick)
     expect(replay.frames.every((frame) => frame.tick >= replay.startTick && frame.tick <= replay.cursorTick)).toBe(true)
     expect(replay.events.every((event) => event.tick <= replay.cursorTick)).toBe(true)
     expect(new Set(replay.events.map((event) => event.id)).size).toBe(replay.events.length)
     for (const frame of replay.frames) checkFrame(frame)
     if (view.phase === 'execution') expect('assessment' in view).toBe(false)
-    else expect(view.assessment.revealTick).toBeLessThanOrEqual(replay.cursorTick)
+    if (view.phase === 'assessment') expect(view.assessment.revealTick).toBeLessThanOrEqual(replay.cursorTick)
   }
 }
 function checkPublicHistory(views: readonly GameView[]) {
@@ -128,6 +137,34 @@ function checkPublicHistory(views: readonly GameView[]) {
 }
 
 describe('real controller scan publication', () => {
+  it.each(['assessment', 'futureFrames', 'both'] as const)('rejects undeclared replay %s at cursor 0 with an otherwise valid shared prefix', (extra) => {
+    const context = setup({ seed: 22, scenario: MOVING_PULSE_SCENARIO })
+    withReproduction(context, MOVING_PULSE_ORDERS, () => {
+      const presentation = commit(context, MOVING_PULSE_ORDERS)
+      const view = execution(context.controller.getView())
+      expect(view.replay.cursorTick).toBe(0)
+      expect(view.replay.frames).toEqual([presentation.frames[0]])
+      expect(view.replay.events).toEqual([])
+      expect(presentation.assessment.revealTick).toBe(100)
+      expect(presentation.frames).toHaveLength(101)
+      const extras = {
+        ...(extra !== 'futureFrames' ? { assessment: presentation.assessment } : {}),
+        ...(extra !== 'assessment' ? { futureFrames: presentation.frames } : {}),
+      }
+      const injected = Object.freeze({ ...view, replay: Object.freeze({ ...view.replay, ...extras }) })
+      expect(injected.replay.frames).toBe(view.replay.frames)
+      expect(injected.replay.events).toBe(view.replay.events)
+      // Reuse the audit sets after the valid view, just as a subscription history does.
+      const objects = new Set<object>()
+      const frames = new Set<PublicReplayFrame>()
+      expect(() => checkPublicView(view, objects, frames)).not.toThrow()
+      expect(() => checkPublicView(injected, objects, frames)).toThrow(/Replay fields/)
+      const cloned = Object.freeze({ ...injected, replay: Object.freeze({ ...injected.replay }) })
+      expect(() => checkPublicView(cloned, objects, frames)).toThrow(/Replay fields/)
+      expect(() => checkPublicHistory([...context.views, injected])).toThrow(/Replay fields/)
+    })
+  })
+
   it.each(SCAN_SEEDS)('unreachable hidden opponent variants publish identical entire view histories, seed=%s', (seed) => {
     let reference: GameView[] | undefined
     let initialOwn: ShipState | undefined
