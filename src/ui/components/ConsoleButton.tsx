@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, MouseEvent, ReactNode, Ref } from 'react'
 
 export type ConsoleButtonVariant = 'standard' | 'quiet' | 'commit'
 
@@ -10,6 +10,7 @@ interface ConsoleButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
    */
   unavailable?: boolean
   icon?: ReactNode
+  ref?: Ref<HTMLButtonElement>
 }
 
 export function ConsoleButton({ variant = 'standard', unavailable = false, icon, children, onClick, ...rest }: ConsoleButtonProps) {

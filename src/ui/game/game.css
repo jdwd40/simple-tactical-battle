@@ -1,0 +1,10 @@
+/* Playable console additions. Tokens and conventions come from src/styles.css. */
+
+.assessment-lines { display: grid; gap: 0.375rem; margin: 0; padding-left: 1.1rem; }
+.assessment-lines li::marker { color: var(--color-command); }
+.assessment-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.875rem; }
+.assessment-actions .console-button[data-variant="commit"] { width: auto; flex: 1 1 10rem; min-height: 2.75rem; font-size: var(--text-title); }
+
+.event-list { display: grid; gap: 0.375rem; margin: 0; padding: 0; list-style: none; }
+.event-item { display: grid; grid-template-columns: 3.25rem 1fr; gap: 0.5rem; color: var(--color-ink-muted); }
+.event-time { color: var(--color-ink-faint); font-size: var(--text-meta); line-height: var(--text-body--line-height); text-align: right; }

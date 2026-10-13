@@ -1,0 +1,39 @@
+# Application controller (TSB-11C)
+
+`src/game` is the application authority between the private engine and the public UI. Only
+`App.tsx` (the composition root) imports it, via `src/game/index.ts`; UI, rendering, AI and
+public fixtures are blocked from it by `src/fixtures/importBoundary.test.ts`.
+
+## Factory
+
+```ts
+const controller = createGameController({
+  seed,                 // first encounter and every same-seed restart
+  newSeed: randomSeed,  // entropy for new-seed restarts (application, never the engine)
+  clock,                // optional PresentationClock (default browserClock)
+  engine,               // optional EngineApi (default SIMULATION_ENGINE) — wrap to count/inspect calls
+  planOpponent,         // optional PlanOpponent (default scriptedPatrol, the interim drill script)
+})
+<GameConsole controller={controller} />   // UI receives only the public GameController
+controller.dispose()                       // unmount: cancels timers, pauses; commands stay usable
+```
+
+The controller implements `GameController` from `src/contracts/public.ts`:
+
+- `getView()` returns a frozen view with a stable reference until the next publish; `subscribe` returns an unsubscribe. `revision` increases on every publish; `encounterId` (`encounter-N`) changes on restart.
+- **Planning entry** observes both sides once: the player view, and the opponent plan from the patrol's own observation, memory and planner stream. Draft edits never re-plan. New planning carries the destination and actual cloak state; sensor and weapon reset.
+- **`setDraft`** (planning only) validates and previews with the engine.
+- **`commit(expectedTurnIndex)`** returns `ignored` (wrong phase or stale turn), `rejected` (structural errors), or `accepted`. It publishes the locked `commit` phase, resolves exactly once, then starts execution playing at the current speed.
+- **Playback** owns the presentation clock: one cursor tick per `tickMs / speed`. `play`, `pause`, `speed`, `seek`, `step` and `skipToEnd` move only the cursor. Views expose frames and events only through the cursor; the assessment appears when the cursor reaches `endTick`. From assessment, `play`, a backward step or a seek replays the recorded frames as `execution` with `replayOf: 'assessment'`; nothing is resolved again.
+- **`finishAssessment`** enters the next planning phase. **`abandon`** gives a terminal `{ kind: 'abandoned' }` view frozen on the last shown frame, with timers stopped. **`restart`** builds a fresh session (same or new seed); a stale timer callback checks encounter ownership and does nothing.
+
+## Test seams (for TSB-12B and later integration)
+
+- `createManualClock()`: time moves only through `clock.advance(ms)`; `clock.pending` counts scheduled ticks. The real cadence is `rules.timing.tickMs / speed`.
+- Wrap `SIMULATION_ENGINE` functions with spies (for example `vi.fn(SIMULATION_ENGINE.resolveTurn)`) to prove single resolution and replay without resimulation.
+- Pass a `PlanOpponent` spy to check once-per-planning-entry planning and its inputs. TSB-40 replaces `scriptedPatrol` through the same option.
+- In the browser, `?seed=<uint32>` gives a reproducible encounter. The dev server exposes `window.__plotDiagnostics()` (drawn-plot summary only); production builds strip it.
+
+## Movement-drill limits (until TSB-20/30/40)
+
+`ENGINE_CAPABILITIES` has no active pulse, laser or missile, so the console fixes the sensor to passive and the weapon to hold. Cloak carries its actual state but has no control yet (TSB-21). The patrol follows a fixed public loop and cannot react or fire. There is no damage, destruction, automatic aftermath or outcome; the terminal view is reached only by abandoning.

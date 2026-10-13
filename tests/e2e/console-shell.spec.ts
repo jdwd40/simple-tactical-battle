@@ -1,7 +1,8 @@
-import { expect, test, type Page } from '@playwright/test'
+// The console opens in genuine turn-1 planning against the real engine and controller.
+// These checks cover the initial state, layout, focus order and accessibility; the full
+// plot/commit/playback/assessment flow is covered in game.spec.ts.
 
-// M0 loads public scenario and own initial data. Engine/controller/PixiJS remain
-// unconnected; these checks prove startup presentation and accessibility, not gameplay.
+import { expect, test, type Page } from '@playwright/test'
 
 function collectErrors(page: Page) {
   const errors: string[] = []
@@ -23,47 +24,41 @@ async function pageOverflow(page: Page) {
   }))
 }
 
-test('loads public terrain and own initial data while gameplay remains unbound', async ({ page }) => {
+test('opens in genuine turn-1 planning with own data only and a deliberate Commit Turn', async ({ page }) => {
   const errors = collectErrors(page)
-  await page.goto('/')
+  await page.goto('/?seed=17')
 
   await expect(page).toHaveTitle('Shadow-Dancer — Tactical Space Battle')
   await expect(page.getByRole('heading', { level: 1, name: 'Shadow-Dancer' })).toBeVisible()
-  await expect(page.getByText('Scenario loaded · M0')).toBeVisible()
-  await expect(page.getByText('Static public terrain · own marker (3, 10). Movement engine pending; no encounter is running.')).toBeVisible()
+  await expect(page.getByText('Movement drill', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('turn-number')).toHaveText('1')
+  await expect(page.locator('[aria-current="step"]')).toHaveText('Planning')
+  await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
+  await expect(page.locator('canvas')).toHaveCount(1)
+
   const own = page.getByRole('region', { name: 'Own ship', exact: true })
-  await expect(own.locator('dd')).toHaveText(['100 / 100', '40 / 40', '100 / 100', '6 / 6', 'Passive', 'Active'])
-  const plotReadout = page.getByRole('region', { name: 'Plot readout', exact: true })
-  await expect(plotReadout.locator('dd')).toHaveText(['(3, 10)', '0', '0'])
-  const scenario = page.getByRole('region', { name: 'Scenario', exact: true })
-  await expect(scenario.locator('dd')).toHaveText(['20 × 20', '12'])
-  await expect(page.getByRole('img', { name: 'Public scenario terrain' })).toHaveAccessibleDescription('20 by 20 grid with 12 known asteroid cells. Own ship at cell (3, 10). No enemy contacts.')
-  await expect(page.locator('[data-own-cell]')).toHaveAttribute('data-own-cell', '3,10')
-  expect(await page.locator('[data-asteroid-cell]').evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-asteroid-cell')))).toEqual(['7,4', '7,5', '8,5', '12,5', '13,5', '13,6', '6,13', '7,13', '7,14', '12,13', '12,14', '13,14'])
-  await expect(page.locator('[data-contact-alias], [data-enemy-position]')).toHaveCount(0)
+  await expect(own.locator('dd')).toHaveText(['100.0 / 100.0', '40 / 40', '100 / 100', '6 / 6', 'Passive', 'On'])
+  const readout = page.locator('#plot-readout')
+  await expect(readout).toContainText('Positioncolumn 3, row 10')
+  await expect(readout).toContainText('No contacts.')
+  await expect(page.getByTestId('movement-order')).toHaveText('Hold position')
 
-  const phases = page.getByRole('list', { name: 'Turn phases' }).getByRole('listitem')
-  await expect(phases).toHaveText(['Planning', 'Commit', 'Execution', 'Assessment'])
-  await expect(page.locator('[aria-current]')).toHaveCount(0)
-
-  const commit = page.getByRole('button', { name: 'Commit turn' })
-  await expect(commit).toHaveAttribute('aria-disabled', 'true')
-  await expect(commit).toHaveAccessibleDescription('Orders can be committed once the simulation engine is connected.')
-  for (const name of ['Back', 'Play', 'Forward', 'Skip to end', 'Abandon', 'Restart']) {
+  const commit = page.getByRole('button', { name: 'Commit turn 1' })
+  await expect(commit).not.toHaveAttribute('aria-disabled')
+  await expect(commit).toHaveAccessibleDescription('Locks these orders and plays the 10-second turn.')
+  for (const name of ['Back', 'Play', 'Forward', 'Skip to end']) {
     await expect(page.getByRole('button', { name, exact: true })).toHaveAttribute('aria-disabled', 'true')
   }
-
-  await commit.click({ force: true })
-  await expect(page.locator('[aria-current]')).toHaveCount(0)
-  await expect(page.getByText('Scenario loaded · M0')).toBeVisible()
-  await page.getByRole('button', { name: 'Play', exact: true }).click({ force: true })
-  await expect(plotReadout.locator('dd')).toHaveText(['(3, 10)', '0', '0'])
+  for (const name of ['Abandon', 'Restart']) {
+    await expect(page.getByRole('button', { name, exact: true })).not.toHaveAttribute('aria-disabled')
+  }
   expect(errors).toEqual([])
 })
 
 test('gives the battlefield the dominant share of a 1366x768 console without page scrolling', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await page.goto('/?seed=17')
   await page.evaluate(() => document.fonts.ready)
+  await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
 
   expect(await pageOverflow(page)).toEqual({ horizontal: 0, vertical: 0 })
 
@@ -85,8 +80,9 @@ test('gives the battlefield the dominant share of a 1366x768 console without pag
 })
 
 test('keyboard reaches every control in planning-flow order with a visible focus ring', async ({ page }, testInfo) => {
-  await page.goto('/')
-  const expected = ['Skip to orders', 'Abandon', 'Restart', 'Back', 'Play', 'Forward', 'Skip to end', 'Commit turn']
+  await page.goto('/?seed=17')
+  await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
+  const expected = ['Skip to orders', 'Abandon', 'Restart', 'Back', 'Play', 'Forward', 'Skip to end', 'Column', 'Row', 'Set destination', 'Hold position', 'Commit turn 1']
 
   for (const name of expected) {
     await page.keyboard.press('Tab')
@@ -101,12 +97,7 @@ test('keyboard reaches every control in planning-flow order with a visible focus
   }
   await page.screenshot({ path: testInfo.outputPath('commit-focus-1366x768.png') })
 
-  await page.keyboard.press('Enter')
-  await page.keyboard.press('Space')
-  await expect(page.getByRole('button', { name: 'Commit turn' })).toHaveAttribute('aria-disabled', 'true')
-  await expect(page.locator('[aria-current]')).toHaveCount(0)
-
-  await page.goto('/')
+  await page.goto('/?seed=17')
   await page.keyboard.press('Tab')
   await page.keyboard.press('Enter')
   await expect(page.locator('#command-rail')).toBeFocused()
@@ -115,7 +106,7 @@ test('keyboard reaches every control in planning-flow order with a visible focus
 for (const viewport of [{ width: 1024, height: 700 }, { width: 390, height: 844 }]) {
   test(`keeps every console region reachable at ${viewport.width}x${viewport.height} without horizontal scrolling`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport)
-    await page.goto('/')
+    await page.goto('/?seed=17')
     await page.evaluate(() => document.fonts.ready)
 
     expect((await pageOverflow(page)).horizontal).toBe(0)
@@ -124,7 +115,7 @@ for (const viewport of [{ width: 1024, height: 700 }, { width: 390, height: 844 
     for (const region of ['Own ship', 'Plot readout', 'Orders', 'Event log']) {
       await expect(page.getByRole('region', { name: region })).toBeAttached()
     }
-    const commit = page.getByRole('button', { name: 'Commit turn' })
+    const commit = page.getByRole('button', { name: 'Commit turn 1' })
     await commit.scrollIntoViewIfNeeded()
     await expect(commit).toBeInViewport()
 
@@ -133,10 +124,10 @@ for (const viewport of [{ width: 1024, height: 700 }, { width: 390, height: 844 
 }
 
 test('respects reduced-motion preferences for control transitions', async ({ page }) => {
-  const commitTransition = () => page.getByRole('button', { name: 'Commit turn' }).evaluate((element) => getComputedStyle(element).transitionDuration)
+  const commitTransition = () => page.getByRole('button', { name: 'Commit turn 1' }).evaluate((element) => getComputedStyle(element).transitionDuration)
 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  await page.goto('/')
+  await page.goto('/?seed=17')
   expect((await commitTransition()).split(', ').some((duration) => duration !== '0s')).toBe(true)
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
