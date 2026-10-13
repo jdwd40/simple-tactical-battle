@@ -43,7 +43,7 @@ One assignment per builder. Lead alone dispatches; reviewer source read-only. In
 
 Review snapshots: reviews/03a-r0@85223d3;11a-r0@f7d2ebd;11a-r1@eb38b7e;02-r0-a3@592d795;03b-r0@0e436. Original handoffs and collected reports in handoffs. Approval applies only to reviewed revision.
 
-Ownership: General simulation/AI/domain; contract/scenario amendments sequenced by lead. Assistant root configuration/lockfile. UI React/application/Pixi. 03B temporary App startup ownership now released; 11C real engine/controller binding follows accepted10+11B. All concurrent writes isolated.
+Ownership: General simulation/AI/domain; contract/scenario amendments sequenced by lead. Assistant root configuration/lockfile. UI React/application/Pixi.03B App ownership released to11C. Lead also transfers src/fixtures/importBoundary.test.ts to UI11C for narrow composition-root amendment: App/main compose private controller; UI/rendering/AI/public fixtures remain strictly barred from authoritative game/simulation/private modules directly or through barrels. Decisions/negative-check expectations: handoffs/TSB-11C-decisions.md. All concurrent writes isolated.
 
 ## Verification and preview
 
