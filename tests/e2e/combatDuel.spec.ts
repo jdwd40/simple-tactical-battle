@@ -3,9 +3,10 @@ import type { DrawSummary, RendererDiagnostics } from '../../src/rendering/Battl
 import { LASER_DUEL } from '../harness/duel/sequence'
 
 // TSB-31 on the REAL engine and controller (lasers, damage batches, destruction, outcomes).
-// Victory uses the application itself; defeat and mutual destruction use the test-only duel
-// page (tests/harness/duel), which composes the same controller with a scripted firing
-// opponent that plans from its own observation. The player orders are LASER_DUEL throughout.
+// These exact-tick scenes use the test-only duel page (tests/harness/duel): the same controller
+// composed with a labelled scripted opponent (the former drill patrol, a firing one or a
+// retaliating one), each planning from its own observation. The main game, with the real
+// patrol AI, is covered by mission.spec.ts. The player orders are LASER_DUEL throughout.
 const DUEL_PAGE = '/tests/harness/duel/index.html'
 
 function trackErrors(page: Page) {
@@ -70,8 +71,8 @@ async function playTurns(page: Page, count: number) {
 test('laser duel to victory: lock, cost, cooldown, replay before effects, reveal only at its tick, restart', async ({ page }, testInfo) => {
   test.setTimeout(90_000)
   const errors = trackErrors(page)
-  await open(page, '/?seed=17')
-  await expect(page.getByText('Combat drill', { exact: true })).toBeVisible()
+  await open(page, '/tests/harness/duel/index.html?seed=17&opponent=scripted')
+  await expect(page.getByText('Test page: scripted opponent', { exact: true })).toBeVisible()
   await expect(weapon(page).getByRole('radio', { name: 'Laser' })).toBeDisabled()
   await expect(weapon(page).getByRole('radio', { name: 'Missile' })).toBeEnabled()
   await expect(page.getByText('No known contact to aim a laser at.', { exact: true })).toBeVisible()
@@ -231,7 +232,7 @@ test('mutual destruction when both lethal shots share tick 601', async ({ page }
 test('an unfired laser at a last-known contact is explained from the assessment, ordered by keyboard under reduced motion', async ({ page }) => {
   const errors = trackErrors(page)
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  await open(page, '/?seed=17')
+  await open(page, '/tests/harness/duel/index.html?seed=17&opponent=scripted')
   for (const [index, cell] of [[0, { column: 16, row: 10 }], [1, { column: 2, row: 18 }]] as const) {
     await page.getByLabel('Column', { exact: true }).fill(String(cell.column))
     await page.getByLabel('Row', { exact: true }).fill(String(cell.row))

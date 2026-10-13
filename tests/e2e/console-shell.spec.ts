@@ -27,10 +27,13 @@ async function pageOverflow(page: Page) {
 test('opens in genuine turn-1 planning with own data only and a deliberate Commit Turn', async ({ page }) => {
   const errors = collectErrors(page)
   await page.goto('/?seed=17')
+  await page.getByRole('button', { name: 'Begin mission' }).click()
 
   await expect(page).toHaveTitle('Shadow-Dancer — Tactical Space Battle')
   await expect(page.getByRole('heading', { level: 1, name: 'Shadow-Dancer' })).toBeVisible()
-  await expect(page.getByText('Combat drill', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('seed')).toHaveText('17')
+  await expect(page.getByText(/drill|interim/i)).toHaveCount(0)
+  await expect(page.getByTestId('opponent-note')).toHaveCount(0)
   await expect(page.getByTestId('turn-number')).toHaveText('1')
   await expect(page.locator('[aria-current="step"]')).toHaveText('Planning')
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
@@ -57,6 +60,7 @@ test('opens in genuine turn-1 planning with own data only and a deliberate Commi
 
 test('gives the battlefield the dominant share of a 1366x768 console without page scrolling', async ({ page }, testInfo) => {
   await page.goto('/?seed=17')
+  await page.getByRole('button', { name: 'Begin mission' }).click()
   await page.evaluate(() => document.fonts.ready)
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
 
@@ -67,7 +71,7 @@ test('gives the battlefield the dominant share of a 1366x768 console without pag
   const ship = await box(page, '.deck-ship')
   const command = await box(page, '.deck-command')
   const transport = await box(page, '.deck-transport')
-  const commit = await box(page, '[data-variant="commit"]')
+  const commit = await box(page, '.commit-station [data-variant="commit"]')
 
   expect(plot.width * plot.height).toBeGreaterThan(0.4 * viewport.width * viewport.height)
   expect(plot.width).toBeGreaterThan(Math.max(ship.width, command.width) * 2)
@@ -82,10 +86,11 @@ test('gives the battlefield the dominant share of a 1366x768 console without pag
 test('keyboard reaches every control in planning-flow order with a visible focus ring', async ({ page }, testInfo) => {
   await page.goto('/?seed=17')
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
-  const expected = ['Skip to orders', 'Abandon', 'Restart', 'Back', 'Play', 'Forward', 'Skip to end', 'Column', 'Row', 'Set destination', 'Hold position', 'Passive', 'On', 'Hold fire', 'Commit turn 1']
-
-  for (const name of expected) {
-    await page.keyboard.press('Tab')
+  // The briefing opens first with its action focused; Enter starts at the orders.
+  await expect(page.getByRole('button', { name: 'Begin mission' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#command-rail')).toBeFocused()
+  const expectFocusRing = async (name: string) => {
     const focused = page.locator(':focus')
     await expect(focused).toHaveAccessibleName(name)
     const outline = await focused.evaluate((element) => {
@@ -95,10 +100,20 @@ test('keyboard reaches every control in planning-flow order with a visible focus
     expect(outline.style).not.toBe('none')
     expect(outline.width).toBeGreaterThanOrEqual(2)
   }
+  for (const name of ['Column', 'Row', 'Set destination', 'Hold position', 'Passive', 'On', 'Hold fire', 'Commit turn 1']) {
+    await page.keyboard.press('Tab')
+    await expectFocusRing(name)
+  }
   await page.screenshot({ path: testInfo.outputPath('commit-focus-1366x768.png') })
 
-  await page.goto('/?seed=17')
-  await page.keyboard.press('Tab')
+  // From the top of the page: skip link, header, playback, then the orders.
+  await page.locator('.skip-link').focus()
+  await expectFocusRing('Skip to orders')
+  for (const name of ['Copy seed link', 'Briefing', 'Abandon', 'Restart', 'Back', 'Play', 'Forward', 'Skip to end', 'Column']) {
+    await page.keyboard.press('Tab')
+    await expectFocusRing(name)
+  }
+  await page.locator('.skip-link').focus()
   await page.keyboard.press('Enter')
   await expect(page.locator('#command-rail')).toBeFocused()
 })
@@ -107,6 +122,7 @@ for (const viewport of [{ width: 1024, height: 700 }, { width: 390, height: 844 
   test(`keeps every console region reachable at ${viewport.width}x${viewport.height} without horizontal scrolling`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport)
     await page.goto('/?seed=17')
+    await page.getByRole('button', { name: 'Begin mission' }).click()
     await page.evaluate(() => document.fonts.ready)
 
     expect((await pageOverflow(page)).horizontal).toBe(0)
@@ -128,6 +144,7 @@ test('respects reduced-motion preferences for control transitions', async ({ pag
 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.goto('/?seed=17')
+  await page.getByRole('button', { name: 'Begin mission' }).click()
   expect((await commitTransition()).split(', ').some((duration) => duration !== '0s')).toBe(true)
 
   await page.emulateMedia({ reducedMotion: 'reduce' })

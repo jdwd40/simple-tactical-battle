@@ -169,7 +169,7 @@ describe('assessment and endings', () => {
     expect(html).toContain('Laser fired at 1.2 s.')
     for (const name of ['Restart encounter', 'New encounter', 'Replay final turn']) expect(html).toContain(`>${name}</button>`)
     expect(html).not.toContain('Commit turn')
-    expect(html).toContain('Combat drill')
+    expect(html).not.toMatch(/drill/i)
   })
 
   it('explains automatic aftermath after own destruction, without orders or commit', () => {

@@ -2,9 +2,9 @@ import { expect, test, type Page } from '@playwright/test'
 import type { DrawSummary, RendererDiagnostics } from '../../src/rendering/BattlefieldRenderer'
 import { DEAD_LAUNCHER, EVASION, type MissileTurn } from '../harness/duel/sequence'
 
-// TSB-31 missiles and automatic aftermath on the REAL engine (TSB-30B), seed 17. The drill
-// patrol scene runs in the application; scenes needing a firing opponent use the test-only
-// duel page (tests/harness/duel). Every tick and position below is real engine output.
+// TSB-31 missiles and automatic aftermath on the REAL engine (TSB-30B), seed 17, on the
+// test-only duel page (tests/harness/duel) with labelled scripted opponents. Every tick and
+// position below is real engine output.
 const DUEL_PAGE = '/tests/harness/duel/index.html'
 
 function trackErrors(page: Page) {
@@ -76,7 +76,7 @@ async function playTurns(page: Page, turns: readonly MissileTurn[], count: numbe
 test('a missile aimed on the plot flies straight and stops on an asteroid face, replayed before and at impact', async ({ page }, testInfo) => {
   test.setTimeout(60_000)
   const errors = trackErrors(page)
-  await open(page, '/?seed=17')
+  await open(page, '/tests/harness/duel/index.html?seed=17&opponent=scripted')
   await playTurns(page, EVASION, 2)
 
   // Turn 3: aim on the plot in the deliberate mode; costs and cooldown before commit.

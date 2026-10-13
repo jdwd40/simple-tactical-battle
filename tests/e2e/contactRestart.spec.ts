@@ -1,3 +1,5 @@
+// Exact contact timings assume the former drill patrol: runs on the test-only real-engine page
+// (tests/harness/duel) with that scripted opponent.
 import { expect, test } from '@playwright/test'
 import type { RendererDiagnostics } from '../../src/rendering/BattlefieldRenderer'
 import { LIFECYCLE_SEQUENCE } from '../../src/tests/game/lifecycleSequence'
@@ -8,7 +10,7 @@ test('restart after acquired/lost contacts clears markers, trail and log with on
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('console', (message) => { if (message.type() === 'error' || /context lost|too many active webgl contexts/i.test(message.text())) errors.push(message.text()) })
-  await page.goto('/?seed=17')
+  await page.goto('/tests/harness/duel/index.html?seed=17&opponent=scripted')
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
   for (const [index, movement] of LIFECYCLE_SEQUENCE.entries()) {
     if (movement.kind !== 'destination') throw new Error('Contact-history fixture needs a destination')

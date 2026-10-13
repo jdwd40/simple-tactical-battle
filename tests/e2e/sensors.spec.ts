@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { DrawSummary, RendererDiagnostics } from '../../src/rendering/BattlefieldRenderer'
 
-// TSB-21 on the real engine and controller. Seed 17 with this route acquires the patrol at
+// TSB-21 on the real engine and controller. The exact-tick scenes assume the former drill patrol,
+// so they run on the test-only real-engine page with that scripted opponent (tests/harness/duel);
+// the keyboard cloak check runs in the main game against the real patrol AI. Seed 17 with this route acquires the patrol at
 // tick 94, loses it at 161 and forgets it at 760; holding cloak drains energy until upkeep
 // fails at 799, and a pulse ordered on 9.8 energy fails at 701. Every number below is
 // engine output observed through the public view.
@@ -52,7 +54,7 @@ async function seek(page: Page, tick: number) {
 test('contact acquisition, loss and expiry, cloak upkeep failure and replay before first detection', async ({ page }, testInfo) => {
   test.setTimeout(90_000)
   const errors = trackErrors(page)
-  await page.goto('/?seed=17')
+  await page.goto('/tests/harness/duel/index.html?seed=17&opponent=scripted')
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
 
@@ -157,7 +159,7 @@ test('a keyboard-ordered pulse finds the patrol early, breaks cloak and exposes 
   test.setTimeout(60_000)
   const errors = trackErrors(page)
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  await page.goto('/?seed=17')
+  await page.goto('/tests/harness/duel/index.html?seed=17&opponent=scripted')
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
 
@@ -252,6 +254,7 @@ test('a keyboard-ordered pulse finds the patrol early, breaks cloak and exposes 
 test('cloak is ordered from the keyboard and its upkeep and signature follow the draft', async ({ page }) => {
   const errors = trackErrors(page)
   await page.goto('/?seed=17')
+  await page.getByRole('button', { name: 'Begin mission' }).click()
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
   const on = group(page, 'Cloak').getByRole('radio', { name: 'On' })
   await on.focus()

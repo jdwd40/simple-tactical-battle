@@ -96,13 +96,13 @@ describe('GameConsole with sensors', () => {
   it('offers a fresh planning pulse even though the planning frame still carries last turn\'s spent flag', () => {
     const html = render(planning({ turnActions: { pulseAttemptSpent: true, weaponIntentSpent: false } }))
     expect(radio(html, 'activePulse')).not.toContain('disabled')
-    expect(html).toContain('Sensor drill')
+    expect(html).not.toMatch(/drill/i)
     expect(html).toContain('The patrol is an interim script: it follows a set route and does not fire.')
   })
 
-  it('names the movement drill and disables the pulse when the engine cannot perform it', () => {
+  it('disables the pulse when the engine cannot perform it', () => {
     const html = render(planning(), false)
-    expect(html).toContain('Movement drill')
+    expect(html).not.toMatch(/drill/i)
     expect(radio(html, 'activePulse')).toContain('disabled=""')
     expect(html).toContain('Lasers are not available in this version yet. Missiles are not available in this version yet.')
   })

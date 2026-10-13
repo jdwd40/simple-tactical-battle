@@ -14,6 +14,7 @@ import { presentGameView } from '../gameplay/viewAdapters'
 import { assessmentLines, OUTCOME_TEXT } from './consoleText'
 import { EventLog } from './EventLog'
 import { OwnShipStatus } from './OwnShipStatus'
+import { SeedControl } from './SeedControl'
 import { SystemOrders } from './SystemOrders'
 import type { OrderCapabilities } from './systemsText'
 import { WeaponOrders } from './WeaponOrders'
@@ -40,24 +41,26 @@ function announcement(view: GameView, turn: number) {
   }
 }
 
-function drillName(capabilities: OrderCapabilities) {
-  if (capabilities.laser || capabilities.missile) return 'Combat drill'
-  return capabilities.activePulse ? 'Sensor drill' : 'Movement drill'
-}
 
 export interface GameConsoleProps {
   readonly controller: GameController
   /** Order kinds the running engine performs, as plain booleans from the composition root. */
   readonly capabilities: OrderCapabilities
-  /** What the opponent is, as composed by the root (the interim drill script in the application). */
-  readonly opponentNote: string
+  /** Test pages describe their scripted opponent here; the main game shows no such note. */
+  readonly opponentNote?: string
+  /** Header tag naming a test or fixture page; the main game has none. */
+  readonly modeLabel?: string
+  /** Seed of the current encounter as plain reproduction data, from the composition root. */
+  readonly seedOf?: (encounterId: string) => number | null
+  /** Reopens the mission briefing; the briefing never changes the encounter. */
+  readonly onBriefing?: () => void
 }
 
 /**
  * The playable console. It sees only the public GameController: published immutable views
  * in, typed commands out. No engine, private state or future frames are reachable here.
  */
-export function GameConsole({ controller, capabilities, opponentNote }: GameConsoleProps) {
+export function GameConsole({ controller, capabilities, opponentNote, modeLabel, seedOf, onBriefing }: GameConsoleProps) {
   const view = useSyncExternalStore(controller.subscribe, controller.getView, controller.getView)
   const presentation = useMemo(() => presentGameView(view), [view])
   // Contact choice is encounter-local and only marks aliases the shown frame knows.
@@ -89,6 +92,7 @@ export function GameConsole({ controller, capabilities, opponentNote }: GameCons
   const restartRef = useRef<HTMLButtonElement>(null)
 
   const turn = turnNumber(view)
+  const seed = seedOf?.(view.encounterId) ?? null
   const { rules } = view
   const map = view.frame.observation.map
   const own = view.frame.observation.ownShip
@@ -188,7 +192,7 @@ export function GameConsole({ controller, capabilities, opponentNote }: GameCons
           onWeapon={setWeapon}
           onAimingChange={setAiming}
         />
-        <p className="order-note" data-testid="opponent-note">{opponentNote}</p>
+        {opponentNote && <p className="order-note" data-testid="opponent-note">{opponentNote}</p>}
       </div>
     </Panel>
   )
@@ -308,8 +312,10 @@ export function GameConsole({ controller, capabilities, opponentNote }: GameCons
             </dl>
             <PhaseTrack phases={TURN_PHASES} current={PHASE_LABEL[view.phase]} />
             <div className="ml-auto flex flex-wrap items-center gap-3">
-              <StatusTag>{drillName(capabilities)}</StatusTag>
+              {modeLabel && <StatusTag>{modeLabel}</StatusTag>}
+              {seed !== null && <SeedControl seed={seed} />}
               <div role="group" aria-label="Encounter" className="flex gap-2">
+                {onBriefing && <ConsoleButton variant="quiet" onClick={onBriefing}>Briefing</ConsoleButton>}
                 <ConsoleButton
                   variant="quiet" unavailable={view.phase === 'terminal' || (view.phase === 'execution' && view.replayOf === 'terminal')}
                   aria-describedby="encounter-help" onClick={() => controller.abandon()}

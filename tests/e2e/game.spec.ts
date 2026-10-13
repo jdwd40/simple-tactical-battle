@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { DrawSummary, RendererDiagnostics } from '../../src/rendering/BattlefieldRenderer'
 
-// TSB-11C: the real application (controller + headless engine + PixiJS plot) in the dev
-// server. `?seed=` makes the encounter reproducible; the patrol is the interim drill script.
+// TSB-11C/41: the real application (controller + headless engine + PixiJS plot + patrol AI)
+// in the dev server. `?seed=` makes the encounter reproducible; the briefing is dismissed first.
 
 function trackErrors(page: Page) {
   const errors: string[] = []
@@ -15,6 +15,7 @@ function trackErrors(page: Page) {
 
 async function open(page: Page, seed = 17) {
   await page.goto(`/?seed=${seed}`)
+  await page.getByRole('button', { name: 'Begin mission' }).click()
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
 }
@@ -126,8 +127,8 @@ test('the cursor prefix shows nothing ahead of playback, and the result is indep
     }
     await expect(phase(page)).toHaveText('Assessment', { timeout: 10_000 })
 
-    // Find when the patrol was first detected, then confirm it is absent one tick earlier.
-    const detected = page.locator('.event-item[data-kind="contact-acquired"] .event-time').first()
+    // Find when the patrol was first detected (the log is newest first), then confirm it is absent one tick earlier.
+    const detected = page.locator('.event-item[data-kind="contact-acquired"] .event-time').last()
     await expect(detected).toBeVisible()
     const seconds = Number((await detected.textContent())!.replace(' s', ''))
     const tick = Math.round(seconds * 10)
@@ -231,7 +232,7 @@ test('abandon stops the encounter without inventing a combat result', async ({ p
   await expect(phase(page)).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Abandon' })).toHaveAttribute('aria-disabled', 'true')
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toHaveAttribute('aria-disabled', 'true')
-  await expect(page.getByText(/victory|defeat|mutual/i)).toHaveCount(0)
+  await expect(page.locator('.console').getByText(/victory|defeat|mutual/i)).toHaveCount(0)
   const frozen = (await drawn(page)).tick
   await page.waitForTimeout(800)
   expect((await drawn(page)).tick).toBe(frozen)

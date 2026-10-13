@@ -14,9 +14,18 @@ const controller = createGameController({
   engine,               // optional EngineApi (default SIMULATION_ENGINE) — wrap to count/inspect calls
   planOpponent,         // optional PlanOpponent (default scriptedPatrol, the interim drill script)
 })
-<GameConsole controller={controller} capabilities={controller.capabilities} opponentNote={...} />   // public surface, capability booleans, opponent description
+<GameConsole controller={controller} capabilities={controller.capabilities} seedOf={...} onBriefing={...} />   // public surface, capability booleans, seed
 controller.dispose()                       // unmount: cancels timers, pauses; commands stay usable
 ```
+
+`App.tsx` composes the controller with `planOpponent` from `src/ai` (TSB-40). That planner
+receives only the patrol's observation, memory and stream, once per planning entry and in each
+automatic window. `scriptedPatrol` remains the default for headless tests and the labelled
+test-only page (`tests/harness/duel`).
+
+`controller.seedOf(encounterId)` returns the current encounter's seed as a plain number (null
+for any other id). The console shows it as reproduction data and builds a `?seed=` link from it.
+Nothing else of the session is exposed.
 
 `controller.capabilities` is the injected engine's `{ activePulse, laser, missile }`, copied as frozen
 booleans and nothing else (TSB-21). The console declares its own structural prop type and never

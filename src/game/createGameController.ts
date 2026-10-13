@@ -51,6 +51,11 @@ export interface GameControllerOptions {
 export interface ApplicationController extends GameController {
   /** The injected engine's capabilities, for the composition root to hand to the console. */
   readonly capabilities: EngineCapabilities
+  /**
+   * Seed of the given encounter while it is the current one, as plain reproduction data; null
+   * for any other id. A primitive only: no session or world state is reachable through it.
+   */
+  seedOf(encounterId: string): number | null
   /** Cancels presentation timers and pauses playback (unmount). Commands remain usable. */
   dispose(): void
 }
@@ -353,6 +358,8 @@ export function createGameController(options: GameControllerOptions): Applicatio
     }),
 
     getView: () => view,
+
+    seedOf: (encounterId) => (encounter.id === encounterId ? encounter.seed : null),
 
     subscribe(listener) {
       listeners.add(listener)

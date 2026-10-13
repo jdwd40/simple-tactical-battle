@@ -37,7 +37,7 @@ test('targets a laser at a known alias and aims a missile only in a deliberate m
   await page.goto(HARNESS)
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
-  await expect(page.getByText('Combat drill', { exact: true })).toBeVisible()
+  await expect(page.getByText('Fixture data, not a running game', { exact: true })).toBeVisible()
 
   // Laser from the keyboard: arrow from Hold fire to Laser, which targets the current contact.
   await weapon(page).getByRole('radio', { name: 'Hold fire' }).focus()

@@ -23,6 +23,9 @@ const controller = createGameController({ seed: seedFromSearch(window.location.s
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <GameConsole controller={controller} capabilities={controller.capabilities} opponentNote={OPPONENT_NOTES[opponent]} />
+    <GameConsole
+      controller={controller} capabilities={controller.capabilities} opponentNote={OPPONENT_NOTES[opponent]}
+      modeLabel="Test page: scripted opponent" seedOf={(id) => controller.seedOf(id)}
+    />
   </StrictMode>,
 )

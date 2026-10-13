@@ -82,3 +82,37 @@
   background: var(--color-hull);
   color: var(--color-ink);
 }
+
+/* Mission briefing: a modal sheet over the console. Planning stays paused behind it. */
+.briefing {
+  /* The reset removes the UA's auto margins; restore centring and let a short viewport scroll. */
+  margin: auto;
+  width: min(46rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 0;
+  border: 1px solid var(--color-edge);
+  background: var(--color-bulkhead);
+  color: var(--color-ink);
+}
+.briefing::backdrop { background: rgb(4 9 10 / 0.72); }
+.briefing-body { display: grid; gap: 0.625rem; padding: 1.25rem 1.75rem 1.5rem; }
+.briefing-body p { margin: 0; max-width: 40rem; text-wrap: pretty; color: var(--color-ink-muted); }
+.briefing-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-ship);
+  line-height: var(--text-ship--line-height);
+  font-weight: 600;
+}
+.briefing-body .briefing-objective { color: var(--color-ink); border-left: 3px solid var(--color-command); padding-left: 0.75rem; }
+.briefing-subtitle { margin: 0.25rem 0 0; font-size: var(--text-title); line-height: var(--text-title--line-height); font-weight: 600; }
+.briefing-tips { display: grid; gap: 0.25rem; margin: 0; padding-left: 1.1rem; color: var(--color-ink-muted); }
+.briefing-tips li::marker { color: var(--color-command); }
+.briefing-body .briefing-seed { font-size: var(--text-meta); }
+.briefing .console-button[data-variant="commit"] { width: auto; min-width: 14rem; }
+
+/* Seed: plain reproduction data in the header. */
+.seed-control { display: flex; align-items: center; gap: 0.5rem; }
+.seed-readout { color: var(--color-ink-muted); white-space: nowrap; }
+.seed-readout [data-testid="seed"] { color: var(--color-ink); font-weight: 600; }
