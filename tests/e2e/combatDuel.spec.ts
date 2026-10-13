@@ -73,8 +73,8 @@ test('laser duel to victory: lock, cost, cooldown, replay before effects, reveal
   await open(page, '/?seed=17')
   await expect(page.getByText('Combat drill', { exact: true })).toBeVisible()
   await expect(weapon(page).getByRole('radio', { name: 'Laser' })).toBeDisabled()
-  await expect(weapon(page).getByRole('radio', { name: 'Missile' })).toBeDisabled()
-  await expect(page.getByText('No known contact to aim a laser at. Missiles are not available in this version yet.')).toBeVisible()
+  await expect(weapon(page).getByRole('radio', { name: 'Missile' })).toBeEnabled()
+  await expect(page.getByText('No known contact to aim a laser at.', { exact: true })).toBeVisible()
 
   await playTurns(page, 2)
   await page.getByRole('button', { name: 'Plan turn 3' }).click()
