@@ -6,7 +6,7 @@ Status: baseline and build plan approved by the user on 2026-10-12: "plan is apr
 
 One browser encounter: Shadow-Dancer versus one Federation Patrol Frigate on an authored 20×20 battlefield. The experience centres on detection, prediction, positioning and concealment under limited energy and ammunition.
 
-A brief mission introduction establishes the closing stage of the interstellar colonial war: the Federation controls the colonies, Earth remains free, and Shadow-Dancer must survive the patrol encounter. Convey this through the introduction, ship names and console; do not expand it into a campaign. Vector ships and simple effects suffice.
+A brief mission introduction establishes the closing stage of the interstellar colonial war: the Federation controls the colonies, Earth remains free, and Shadow-Dancer must survive the patrol encounter. Convey this through the introduction, ship names and console; do not expand it into a campaign. Use developed vector ship silhouettes and layered combat effects; a substantial asset pipeline remains deferred.
 
 WEGO is fixed: unlimited paused planning, simultaneous commitment, 10 seconds of execution in 100ms steps, assessment and observer-faithful replay. Include movement and heading, passive/active sensors, cloak, last-known contacts, lasers, travelling missiles, shields/hull, reactive fair AI, three destruction outcomes, same-seed restart and an abandon/restart action. Playback never changes combat.
 
@@ -48,7 +48,9 @@ Finalise an outcome only at a completed turn boundary with a destroyed ship and 
 
 ## Presentation and opponent
 
-Use a restrained military command console with the battlefield dominant. The UI Builder should apply its frontend-design skill when available. Solid measured contacts, dashed stale contacts with age/uncertainty, labelled planned paths, executed trails and distinct plotted targets must remain understandable without colour. Show phase, draft orders, conditional readiness, own resources, exposure/cloak, filtered events and deliberate Commit Turn. Provide keyboard destination/target entry alongside canvas interaction, visible focus, playback controls, reduced motion and a usable 1366×768 layout.
+Use a visually engaging military command console with the battlefield dominant. The UI Builder should apply its frontend-design skill when available. Solid measured contacts, dashed stale contacts with age/uncertainty, labelled planned paths, executed trails and distinct plotted targets must remain understandable without colour. Show phase, draft orders, conditional readiness, own resources, exposure/cloak, filtered events and deliberate Commit Turn. Provide keyboard destination/target entry alongside canvas interaction, visible focus, playback controls and reduced motion.
+
+The user's 2026-10-13 playtest approved additional release requirements: confirmed outgoing hits and incoming shield/hull damage need clear battlefield effects, readable notices and prominent assessment summaries even after Skip; the game must support a full touch-only phone flow (390×844,360×800 and landscape) as well as1366×768; the visual presentation needs stronger ships, weapon/impact/scan effects and polish. Existing observed-impact/own-damage events supply the evidence: distinguish a discharge from an observed hit and an unconfirmed effect. Preserve observer boundaries and replay timestamps; richer presentation cannot invent enemy health, hidden origins or unseen motion. Human gameplay acceptance remains separate from automated verification.
 
 The frigate uses PATROL → INVESTIGATE → ENGAGE → SEARCH after contact loss. It sometimes requests a single scan pulse, investigates remembered sightings, leads missiles using measured motion, and disengages or evades when resources/threats warrant. Its planner receives only its observation, memory and independent seeded tie-break input. It never sees player orders or replans during execution.
 
