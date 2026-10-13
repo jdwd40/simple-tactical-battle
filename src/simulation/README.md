@@ -1,15 +1,15 @@
-# Simulation engine (TSB-10 movement, TSB-20 sensors and stealth, TSB-30A lasers)
+# Simulation engine (TSB-10 movement, TSB-20 sensors and stealth, TSB-30 lasers and missiles)
 
 `src/simulation/index.ts` is the engine/application entry point. It imports private contracts, so only the application controller may use it; UI, rendering and the AI planner must not. All functions are pure: inputs are never mutated and every result is recursively frozen.
 
 | Export | Signature | Notes |
 | --- | --- | --- |
 | `initialiseSession` | `InitialiseSession` (`contracts/private.ts`) | Revalidates scenario/rules, derives independent uint32 streams (`random.simulation`, `random.planners.{player,patrol}`), no initial contacts. |
-| `resolveTurn` | `ResolveTurn` | Exactly `rules.timing.turnTicks` ticks. Throws on a structurally invalid locked envelope, a turn/tick mismatch, orders for a destroyed ship, or a state that already has an outcome. |
+| `resolveTurn` | `ResolveTurn` | One normal or automatic window of exactly `rules.timing.turnTicks` ticks. Throws on a structurally invalid locked envelope, a turn/tick mismatch, orders for a destroyed ship, missing orders for a living one, `automatic` not matching the player's destruction, or a state that already has an outcome. |
 | `observeSide` | `(state, side, rules, scenario) => SideObservation` | Planning-entry observation; `events` and `ownShip.interruptions` are empty for the coming turn. |
 | `validateOrders` | `ValidateOrders` (`contracts/public.ts`) | Own observation, public map and rules only. Forecasts replay the engine's grant order exactly (see Sensors). |
 | `previewRoute` | `PreviewRoute` | Same route logic as the engine; waypoints start at the current position. |
-| `ENGINE_CAPABILITIES` | `{ activePulse: true, laser: true, missile: false }` | Controls should offer only implemented capabilities. |
+| `ENGINE_CAPABILITIES` | `{ activePulse: true, laser: true, missile: true }` | Every equipped order is implemented. |
 
 ```ts
 import { initialiseSession, observeSide, previewRoute, resolveTurn, validateOrders } from '../simulation'
@@ -80,7 +80,7 @@ if (validation.structurallyValid) {
 - **Post-fire sensing.** Emissions are sensed in the same tick against the pre-damage state and are merged with the pre-fire sightings into one measurement per tick. Fire is never evaluated twice in a tick, so a newly revealed shooter can be attacked only from the next tick.
   - An observer that sighted a ship in its destruction tick records `observedDestructionTick` on that contact and `observedOpponentDestructionTick` in its knowledge. Memory is never deleted; a dead observer keeps its contacts, which go stale.
   - An unobserved destruction changes nothing that the observer can see or validate before the boundary.
-- **Outcome.** The full turn always runs. At its boundary, a destroyed ship and no missiles classify the result:
+- **Outcome.** The full turn always runs. At its boundary, a destroyed ship and no live missiles classify the result (see TSB-30B for windows with live ordnance):
   - only the frigate destroyed = `victory`;
   - only Shadow-Dancer destroyed = `defeat`;
   - both = `mutual-destruction`.
@@ -109,8 +109,53 @@ if (validation.structurallyValid) {
   - Warning: cloak with a laser adds `activity-breaks-cloak`.
   - The propulsion forecast does not anticipate when the laser will fire.
 
+## Missiles, persistence and endings (TSB-30B)
+
+- **Launch.** `weapon: { kind: 'missile', aim: Cell }` plots one map cell. There is no contact, homing or aim rewriting.
+  - The missile launches at the first tick where `missileReadyTick <= now` and `missile.costMilli` (10,000) remains after the regeneration, sustain, pulse and propulsion grants, and never more than once per turn.
+  - Each launch costs 10,000 milli-energy and one round of ammunition, and sets `missileReadyTick = now + missileCooldownTicks` (100, absolute, carried across turns).
+  - It triggers the same exposure and cloak activity latch as a laser.
+  - The missile starts at the launcher's moved position, travels from the next tick, and expires at `launchTick + missileLifetimeTicks` (150).
+  - Missiles persist across turns and after their launcher is destroyed; `nextState.missiles` holds them.
+- **Stage-6 sweep.** Each missile present at tick start advances by integer progress along launch → aim, 200 units per tick.
+  - The tick's path is swept against asteroid rectangles, treating the missile as a 100-unit circle.
+  - Each opposing ship alive at tick start is swept relative to that ship's own start → end motion (contact at 350 units). The launcher's own side is never struck directly.
+  - The earliest time fraction in the tick wins. Exact ties go asteroid → ship → arrival → expiry.
+  - Arrival, asteroid and ship ends detonate; expiry is harmless removal. Launch and aim lie inside the convex arena, so `exit` cannot occur.
+- **Splash.** At a detonation, every ship alive at tick start (including the launcher) takes `missile.damage` (45) once if:
+  - its position sampled at the impact fraction is within `blastRadiusUnits` (750) of the impact point, and
+  - it has line of sight from that point.
+
+  The direct victim is guaranteed that single hit, never a second one. Beams and missile hits of one tick form a single damage batch (shields, then hull, then destruction), so a ship destroyed in a batch still completes its own same-tick shot or launch.
+- **Ordnance knowledge (per side, never the aim or launcher):**
+  - **Hostile missiles:** while the observer is alive, a hostile missile within its funded missile range and line of sight is tracked. The range is `passiveMissileRangeUnits` (7,000), or `activeMissileRangeUnits` (10,000) while tracking. Each missile gets a stable `missile-N` alias.
+  - **Lost tracks:** an unseen missile becomes an age-labelled stale sighting. Its uncertainty is `age × missile speed`, capped at the farthest map corner.
+  - **Track end:** a track ends (`hostile-missile-expired`) only when the observer saw the missile end, or `missileLifetimeTicks` after its last sighting. An unseen detonation never deletes memory.
+  - **Detonations:** a detonation seen by an observer that it did not strike directly yields `observed-impact` (rounded position; `contactAlias` only when the struck ship was its current contact).
+  - **Own telemetry:** `ownMissiles` is updated every tick, continues after the launcher dies, and never names a victim. `own-missile` events fire at launch and at the end, with status `detonated`, `expired` or `exited-map`.
+  - **Launch events:** a launch yields `own-shot` (`{ kind: 'missile', aim }`), `own-energy` (`reason: 'missile'`) and `own-ammunition` (−1). A launch the opponent sights yields its `observed-shot` (`weapon: 'missile'`).
+- **Boundaries.** At a completed window's `endTick`, a destroyed ship plus no live missiles classifies the outcome, as for lasers.
+  - **Destroyed ship with live missiles:** there is no outcome, and the private `nextState.terminalPending` is set.
+  - **`assessment.ordnancePending`** is non-null only for an observer that knows of a destruction (its own, or an observed opponent's): `known-own-missiles` (its flying missile IDs) first, otherwise `observed-opponent-destroyed`. An unobserved enemy death changes nothing the player sees or validates and yields no pending explanation; event IDs are numbered per side, so they reveal nothing either.
+  - **After an observed destruction:** the observer's weapon orders fail validation (`observed-opponent-destroyed`), but evasive movement remains available.
+- **Validation (missiles):**
+  - Errors: `out-of-bounds` (aim, with `cell`), `no-ammunition` and `observed-opponent-destroyed`.
+  - Conditionals for the first tick: `awaiting-cooldown` (`readyTick`) and `awaiting-energy`.
+  - Warning: cloak with a launch adds `activity-breaks-cloak`.
+
+### Application API for windows (UI-31)
+
+1. After each `resolveTurn`, read `nextState.outcome`. When it is set, the encounter is over; its reveal tick is `endTick`.
+2. Otherwise build the next `AcceptedTurn` with `startTick = nextState.tick` and `turnIndex = nextState.turnIndex`:
+   - **Player alive:** a normal turn. `automatic: false`, the player's committed orders, and patrol orders from the planner if the patrol is alive (`null` if it is destroyed).
+   - **Player destroyed:** an automatic window. `automatic: true`, `orders.player = null`, and `orders.patrol` from the planner (its own observation, memory and RNG) if the patrol is alive, otherwise `null`.
+   - **Both destroyed:** a drain window with `null`/`null` orders.
+3. Count automatic windows from the player's destruction and stop with an internal invariant failure (never a draw) if they exceed `aftermathWindowBound(rules, remainingSurvivorAmmunition)`. The engine does not count them.
+4. These private facts stay out of presentation: `ships[side].alive`, `nextState.missiles`, `terminalPending`. Only the destroyed player's own `ownShip.status` is public.
+
 ## Limitations (next work packages)
 
-- Missile intents are rejected by `validateOrders` (`equipment-unavailable`) and by `resolveTurn`. Projectiles, ammunition, splash, hostile-missile sensing, `ordnancePending`, `terminalPending` and the automatic aftermath windows arrive in TSB-30B; outcome classification already takes a live-missile count.
-- A ship alive at turn start always makes its first-tick pulse attempt, so `sensorAttempt` never reports `own-destroyed`. `resolveTurn` throws if the state contains missiles. Planner memory and random streams pass through unchanged; patrol ordering belongs to the TSB-40 planner.
+- A ship alive at turn start always makes its first-tick pulse attempt, so `sensorAttempt` never reports `own-destroyed`. Planner memory and random streams pass through unchanged; patrol ordering and automatic-window orders belong to the planner/application (TSB-40/UI-31).
+- Swept contact fractions use exact closed-form roots in double precision. Exact ties are reproduced for integer-aligned geometry; other near-ties resolve deterministically by the computed value.
+- A committed missile intent still launches after its owner observes the opponent's destruction mid-turn (no replanning during execution). The hold-fire restriction applies from the next planning phase.
 - `propulsion-funding` is a forecast from the own observation. It only states that movement may pause.
