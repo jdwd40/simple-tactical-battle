@@ -56,10 +56,17 @@ function predicted(contact: ContactMemory, ticksAhead: number, observation: Side
   return clampToMap({ x: position.x + dx, y: position.y + dy }, observation.map, rules)
 }
 
+/** A stale contact measured again since the last plan (seen briefly in between): a new lead to investigate. */
+function resighted(previous: PlannerMemory, contact: ContactMemory | undefined): boolean {
+  if (contact === undefined || contact.kind !== 'stale') return false
+  const remembered = previous.rememberedContacts.find((candidate) => candidate.alias === contact.alias)
+  return remembered === undefined || remembered.measurement.tick !== contact.measurement.tick
+}
+
 function nextPolicy(previous: PlannerMemory, contact: ContactMemory | undefined, here: Cell): Policy {
   if (contact === undefined) return 'PATROL'
   if (contact.kind === 'current') return 'ENGAGE'
-  if (previous.policy === 'ENGAGE' || previous.policy === 'PATROL') return 'INVESTIGATE'
+  if (previous.policy === 'ENGAGE' || previous.policy === 'PATROL' || resighted(previous, contact)) return 'INVESTIGATE'
   if (previous.policy === 'INVESTIGATE') {
     const target = previous.searchDestination
     return target === null || chebyshev(target, here) > 1 ? 'INVESTIGATE' : 'SEARCH'
@@ -103,7 +110,7 @@ export function createOpponentPlanner(rules: Ruleset, tuning: typeof PLANNER_TUN
           + (segmentClear(centre, target, map, rules) ? 0 : 5 * units) + 0.3 * distance(centre, own.position), rules)
       searchDestination = null
     } else if ((policy === 'INVESTIGATE' || policy === 'SEARCH') && contact !== undefined) {
-      const fresh = policy !== memory.policy || searchDestination === null || chebyshev(searchDestination, here) <= 1
+      const fresh = policy !== memory.policy || resighted(memory, contact) || searchDestination === null || chebyshev(searchDestination, here) <= 1
         || !reachable.some((cell) => sameCell(searchDestination, cell))
       if (fresh) {
         const centre = predicted(contact, contact.ageTicks, observation, rules)
@@ -172,7 +179,10 @@ export function createOpponentPlanner(rules: Ruleset, tuning: typeof PLANNER_TUN
         weapon = { kind: 'laser', contactAlias: contact.alias }
       }
     }
-    if (policy === 'ENGAGE' && own.hull.current <= tuning.disengageHull && weapon.kind === 'laser') weapon = { kind: 'hold' }
+    // A weak ship holds fire only when that lets it cloak away; a ship that stays visible returns fire as it withdraws.
+    const cloakTurnMilli = rules.ships[own.shipClass].cloakMilliPerTick * rules.timing.turnTicks
+    const canConceal = own.equipment.cloak && affords(cloakTurnMilli)
+    if (policy === 'ENGAGE' && own.hull.current <= tuning.disengageHull && weapon.kind === 'laser' && canConceal) weapon = { kind: 'hold' }
 
     // A pulse only where it can find something, and never at the cost of the chosen weapon's energy.
     const weaponCost = weapon.kind === 'laser' ? rules.laser.costMilli : weapon.kind === 'missile' ? rules.missile.costMilli : 0
@@ -187,7 +197,7 @@ export function createOpponentPlanner(rules: Ruleset, tuning: typeof PLANNER_TUN
       }
     }
     // Concealment for a cloak-equipped ship when it is not about to act.
-    const cloak = own.equipment.cloak && sensor === 'passive' && weapon.kind === 'hold' && affords(rules.ships[own.shipClass].cloakMilliPerTick * rules.timing.turnTicks)
+    const cloak = own.equipment.cloak && sensor === 'passive' && weapon.kind === 'hold' && affords(cloakTurnMilli)
 
     const orders: TurnOrders = {
       turnIndex: observation.turnIndex,

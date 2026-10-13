@@ -125,13 +125,14 @@ describe('bounded headless encounters (3 scripts × seeds 1–3, ≤ 40 normal t
     }
   })
 
-  it('records reproducible outcomes and diagnostics (baseline hypotheses; balance belongs to TSB-51)', () => {
+  // TSB-51 re-pinned stalker seed 1 only: re-investigating a newer sighting (D2) reacquired the player two turns earlier.
+  it('records reproducible outcomes and diagnostics (baseline hypotheses, see src/tests/balance)', () => {
     const row = (name: string, seed: number, result: string, normalTurns: number, policies: string, patrolWeapons: string, patrolPulses: number) =>
       ({ name, seed, result, normalTurns, automaticWindows: 0, policies, patrolWeapons, patrolPulses, scriptFallbacks: 0 })
     const lasers = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => `${from + index}:laser`).join(' ')
     expect(runs.map(({ name, seed, result, normalTurns, automaticWindows, policies, patrolWeapons, patrolPulses, scriptFallbacks }) =>
       ({ name, seed, result, normalTurns, automaticWindows, policies, patrolWeapons, patrolPulses, scriptFallbacks }))).toEqual([
-      row('stalker', 1, 'defeat', 12, 'PATROL>ENGAGE>INVESTIGATE>SEARCH', lasers(5, 11), 2),
+      row('stalker', 1, 'defeat', 10, 'PATROL>ENGAGE>INVESTIGATE', lasers(5, 9), 2),
       row('stalker', 2, 'defeat', 6, 'PATROL>INVESTIGATE>ENGAGE>INVESTIGATE', lasers(2, 5), 1),
       row('stalker', 3, 'defeat', 6, 'PATROL>INVESTIGATE>ENGAGE>INVESTIGATE', lasers(2, 5), 2),
       row('hunter', 1, 'defeat', 5, 'PATROL>ENGAGE', lasers(1, 4), 1),

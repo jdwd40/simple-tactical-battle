@@ -18,9 +18,9 @@ const freshMemory = start.plannerMemory.patrol
 const rng = start.random.planners.patrol
 
 /** Public-shape observation of the patrol at its spawn (16,10), with chosen own facts and knowledge. */
-function view(patch: { contacts?: ContactMemory[]; hostileMissiles?: HostileOrdnanceMemory[]; own?: Partial<SideObservation['ownShip']>; destroyedTick?: number } = {}): SideObservation {
+function view(patch: { tick?: number; contacts?: ContactMemory[]; hostileMissiles?: HostileOrdnanceMemory[]; own?: Partial<SideObservation['ownShip']>; destroyedTick?: number } = {}): SideObservation {
   return {
-    ...patrolView, contacts: patch.contacts ?? [], hostileMissiles: patch.hostileMissiles ?? [],
+    ...patrolView, tick: patch.tick ?? patrolView.tick, contacts: patch.contacts ?? [], hostileMissiles: patch.hostileMissiles ?? [],
     ownShip: { ...patrolView.ownShip, ...patch.own },
     ...(patch.destroyedTick === undefined ? {} : { observedOpponentDestructionTick: patch.destroyedTick }),
   }
@@ -29,8 +29,9 @@ const current = (x: number, y: number, velocity?: { xUnitsPerTick: number; yUnit
   alias: 'contact-1', kind: 'current', ageTicks: 0, uncertaintyRadiusUnits: 0, measurement: { position: { x, y }, tick: 0 },
   ...(velocity === undefined ? {} : { previousMeasurement: { position: { x: x - velocity.xUnitsPerTick, y: y - velocity.yUnitsPerTick }, tick: -1 }, estimatedVelocity: velocity }),
 })
-const stale = (x: number, y: number, ageTicks: number): ContactMemory => ({
-  alias: 'contact-1', kind: 'stale', ageTicks, uncertaintyRadiusUnits: ageTicks * 100, measurement: { position: { x, y }, tick: -ageTicks },
+/** A stale contact at observation tick `now`, measured `ageTicks` earlier. */
+const stale = (x: number, y: number, ageTicks: number, now = 0): ContactMemory => ({
+  alias: 'contact-1', kind: 'stale', ageTicks, uncertaintyRadiusUnits: ageTicks * 100, measurement: { position: { x, y }, tick: now - ageTicks },
 })
 const memoryWith = (patch: Partial<PlannerMemory>): PlannerMemory => ({ ...freshMemory, ...patch })
 const legal = (observation: SideObservation, planned: TurnOrders) => validateOrders(planned, observation, DUEL_RULES)
@@ -50,8 +51,8 @@ describe('policy state machine from own knowledge', () => {
     expect(investigate.memory).toMatchObject({ policy: 'INVESTIGATE', searchDestination: { column: 10, row: 10 } })
     expect(investigate.orders).toMatchObject({ movement: { kind: 'destination', cell: { column: 10, row: 10 } }, weapon: { kind: 'laser', contactAlias: 'contact-1' } })
     expect(validateOrders(investigate.orders, lost, DUEL_RULES).issues.map((issue) => issue.code)).toContain('awaiting-current-lock')
-    // Arrived without reacquiring: search a seeded point inside the uncertainty disc.
-    const arrived = view({ contacts: [stale(10_500, 10_500, 120)], own: { position: { x: 10_500, y: 10_500 } } })
+    // A turn later, arrived without reacquiring (the same measurement, now older): search a seeded point inside the uncertainty disc.
+    const arrived = view({ tick: 100, contacts: [stale(10_500, 10_500, 120, 100)], own: { position: { x: 10_500, y: 10_500 } } })
     const search = planOpponent(arrived, investigate.memory, investigate.plannerRandomState)
     expect(search.memory.policy).toBe('SEARCH')
     expect(search.memory.searchDestination).not.toBeNull()
@@ -60,6 +61,20 @@ describe('policy state machine from own knowledge', () => {
     // Memory expired: back to the seeded patrol.
     const forgotten = planOpponent(view({ own: { position: { x: 10_500, y: 10_500 } } }), search.memory, search.plannerRandomState)
     expect(forgotten.memory).toMatchObject({ policy: 'PATROL', searchDestination: null, patrolOrder: patrol.memory.patrolOrder })
+  })
+
+  it('re-investigates a newer sighting of a stale contact instead of finishing an outdated route (TSB-51 D2)', () => {
+    // Remembered at tick -60 near (10,13) heading south; seen briefly again at tick -40 at (8,10), stale again at planning.
+    const south = { estimatedVelocity: { xUnitsPerTick: 0, yUnitsPerTick: 100 } }
+    const old = { ...stale(10_500, 13_700, 60), ...south }
+    for (const policy of ['INVESTIGATE', 'SEARCH'] as const) {
+      const memory = memoryWith({ policy, searchDestination: { column: 10, row: 19 }, rememberedContacts: [old] })
+      const unchanged = planOpponent(view({ tick: 100, contacts: [{ ...stale(10_500, 13_700, 160, 100), ...south }] }), memory, rng)
+      expect(unchanged.memory).toMatchObject({ policy, searchDestination: { column: 10, row: 19 } })
+      const newer = planOpponent(view({ tick: 100, contacts: [stale(8500, 10_500, 140, 100)] }), memory, rng)
+      expect(newer.memory).toMatchObject({ policy: 'INVESTIGATE', searchDestination: { column: 8, row: 10 } })
+      expect(newer.orders.movement).toEqual({ kind: 'destination', cell: { column: 8, row: 10 } })
+    }
   })
 
   it('reacquires honestly: a stale contact seen again returns to ENGAGE under the same alias', () => {
@@ -124,7 +139,12 @@ describe('legal, resource-aware tactics', () => {
   it('disengages when weak, evades known ordnance and holds fire after a confirmed kill', () => {
     const weak = view({ contacts: [current(12_500, 10_500)], own: { hull: { current: 30, max: 100 } } })
     const flee = planOpponent(weak, memoryWith({ policy: 'ENGAGE' }), rng)
-    expect(flee.orders.weapon.kind).not.toBe('laser')
+    // The uncloakable frigate stays visible to a contact this close, so it returns fire while withdrawing (TSB-51 D1).
+    expect(flee.orders.weapon).toEqual({ kind: 'laser', contactAlias: 'contact-1' })
+    expect(legal(weak, flee.orders).structurallyValid).toBe(true)
+    // A cloak-equipped hull in the same spot holds fire so that it can cloak away instead.
+    const cloaker = view({ contacts: [current(12_500, 10_500)], own: { hull: { current: 30, max: 100 }, shipClass: 'shadow-dancer', equipment: { ...patrolView.ownShip.equipment, cloak: true } } })
+    expect(planOpponent(cloaker, memoryWith({ policy: 'ENGAGE' }), rng).orders).toMatchObject({ weapon: { kind: 'hold' }, cloak: true })
     expect(flee.orders.movement.kind).toBe('destination')
     if (flee.orders.movement.kind !== 'destination') throw new Error('destination expected')
     // Breaks contact into cover: farther than now (4 cells) and out of the contact's sightline.
