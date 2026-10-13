@@ -8,14 +8,22 @@ import type { InitialiseSession, ResolveTurn } from '../contracts/private'
 import { freezeData } from '../scenarios/freeze'
 import { DUEL_SCENARIO } from '../scenarios/private'
 import { DUEL_RULES } from '../scenarios/public'
-import { initialiseSession, observeSide, previewRoute, resolveTurn, validateOrders } from '../simulation'
+import { ENGINE_CAPABILITIES, initialiseSession, observeSide, previewRoute, resolveTurn, validateOrders } from '../simulation'
 import { browserClock, type PresentationClock } from './presentationClock'
 import { scriptedPatrol } from './scriptedPatrol'
 
 type Speed = ReplayPrefix['playback']['speed']
 
+/** Order kinds the engine actually performs; controls offer only these. */
+export interface EngineCapabilities {
+  readonly activePulse: boolean
+  readonly laser: boolean
+  readonly missile: boolean
+}
+
 /** The engine functions the controller calls; injectable so tests can count or wrap them. */
 export interface EngineApi {
+  readonly capabilities: EngineCapabilities
   readonly initialiseSession: InitialiseSession
   readonly observeSide: (state: SimulationState, side: 'player' | 'patrol', rules: Ruleset, scenario: Scenario) => SideObservation
   readonly validateOrders: ValidateOrders
@@ -23,7 +31,7 @@ export interface EngineApi {
   readonly resolveTurn: ResolveTurn
 }
 
-export const SIMULATION_ENGINE: EngineApi = { initialiseSession, observeSide, validateOrders, previewRoute, resolveTurn }
+export const SIMULATION_ENGINE: EngineApi = { capabilities: ENGINE_CAPABILITIES, initialiseSession, observeSide, validateOrders, previewRoute, resolveTurn }
 
 export interface GameControllerOptions {
   /** Seed for the first encounter and every same-seed restart until a new seed is drawn. */
@@ -40,6 +48,8 @@ export interface GameControllerOptions {
 
 /** The public controller plus application lifecycle. UI receives only the GameController part. */
 export interface ApplicationController extends GameController {
+  /** The injected engine's capabilities, for the composition root to hand to the console. */
+  readonly capabilities: EngineCapabilities
   /** Cancels presentation timers and pauses playback (unmount). Commands remain usable. */
   dispose(): void
 }
@@ -239,6 +249,13 @@ export function createGameController(options: GameControllerOptions): Applicatio
   }
 
   const controller: ApplicationController = {
+    // Whitelisted immutable booleans only; nothing else of the engine reaches the console.
+    capabilities: Object.freeze({
+      activePulse: engine.capabilities.activePulse === true,
+      laser: engine.capabilities.laser === true,
+      missile: engine.capabilities.missile === true,
+    }),
+
     getView: () => view,
 
     subscribe(listener) {

@@ -202,7 +202,7 @@ test('current and last-known contacts follow the frame at the cursor, never late
   expect(staleContact.kind).toBe('stale')
   expect(staleContact.radiusPx).toBeCloseTo(1.5 * cellPx, 1)
   await expect(readout.locator('[data-alias="contact-1"]')).toContainText('Last known')
-  await expect(readout.locator('[data-alias="contact-1"]')).toContainText('Seen 1.5 s ago at column 15, row 12, now anywhere within 1.5 cells.')
+  await expect(readout.locator('[data-alias="contact-1"]')).toContainText('Seen 1.5 s ago at column 15, row 12, 5.7 cells away on bearing 114°; now anywhere within 1.5 cells of that point.')
   await page.screenshot({ path: testInfo.outputPath('contact-stale-tick70.png') })
 
   // Paused wall time never grows the published uncertainty.

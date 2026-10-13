@@ -1,5 +1,5 @@
 import type { Tick, ValidationIssue } from '../../contracts'
-import { issueMessage, SEVERITY_LABEL } from './validationText'
+import { issueMessage, severityLabel } from './validationText'
 
 interface ValidationIssuesProps {
   readonly issues: readonly ValidationIssue[]
@@ -16,7 +16,7 @@ export function ValidationIssues({ issues, tickMs, tick }: ValidationIssuesProps
         <li key={`${issue.code}-${index}`} className="issue" data-severity={issue.severity}>
           <span className="issue-severity">
             <span aria-hidden="true" className="issue-glyph" />
-            {SEVERITY_LABEL[issue.severity]}
+            {severityLabel(issue)}
           </span>
           <span>{issueMessage(issue, { tickMs, tick })}</span>
         </li>

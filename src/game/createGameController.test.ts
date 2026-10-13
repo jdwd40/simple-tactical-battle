@@ -389,3 +389,16 @@ describe('createGameController: re-entrant lifecycle during commit publication',
     expect(controller.getView()).toBe(after)
   })
 })
+
+describe('createGameController: capability metadata', () => {
+  it('hands the composition root only frozen capability booleans from the injected engine', () => {
+    expect(setup().controller.capabilities).toEqual({ ...SIMULATION_ENGINE.capabilities })
+    const loose = { activePulse: 1, laser: 'yes', missile: false, resolveTurn: SIMULATION_ENGINE.resolveTurn } as unknown as EngineApi['capabilities']
+    const controller = createGameController({ seed: 17, newSeed: () => 1, clock: createManualClock(), engine: { ...SIMULATION_ENGINE, capabilities: loose } })
+    expect(controller.capabilities).toEqual({ activePulse: false, laser: false, missile: false })
+    expect(Object.isFrozen(controller.capabilities)).toBe(true)
+    expect(Object.keys(controller.capabilities).sort()).toEqual(['activePulse', 'laser', 'missile'])
+    const pulse = createGameController({ seed: 17, newSeed: () => 1, clock: createManualClock(), engine: { ...SIMULATION_ENGINE, capabilities: { activePulse: true, laser: false, missile: false } } })
+    expect(pulse.capabilities.activePulse).toBe(true)
+  })
+})

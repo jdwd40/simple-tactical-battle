@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { OwnRoutePreview } from '../contracts'
+import { DUEL_RULES, type OwnRoutePreview } from '../contracts'
 import { buildScene, interpolateScene, splitPathAt } from './plotScene'
 import { current, frameAt, stale } from './testFrames'
 
@@ -36,8 +36,39 @@ describe('buildScene', () => {
     const frame = frameAt(30, { x: 3500, y: 10_500 }, [stale('contact-1', { x: 15_000, y: 12_000 }, 10, 20, 2000)])
     expect(buildScene({ frames: [frame] }).contacts).toEqual([{
       alias: 'contact-1', kind: 'stale', position: { x: 15_000, y: 12_000 }, measurementTick: 10, ageTicks: 20,
-      uncertaintyRadiusUnits: 2000, velocity: null, destroyed: false,
+      uncertaintyRadiusUnits: 2000, velocity: null, destroyed: false, selected: false,
     }])
+  })
+
+  it('marks only a selected alias the shown frame knows', () => {
+    const frame = frameAt(30, { x: 3500, y: 10_500 }, [current('contact-1', { x: 9000, y: 9000 }, 30), stale('contact-2', { x: 15_000, y: 12_000 }, 10, 20, 2000)])
+    expect(buildScene({ frames: [frame], selectedAlias: 'contact-2' }).contacts.map((contact) => contact.selected)).toEqual([false, true])
+    expect(buildScene({ frames: [frameAt(5, { x: 3500, y: 10_500 })], selectedAlias: 'contact-2' }).contacts).toEqual([])
+  })
+
+  it('draws nominal sensor reach from public rules only, with the draft pulse as a prediction', () => {
+    const sensors = DUEL_RULES.sensors
+    const planning = frameAt(0, { x: 3500, y: 10_500 })
+    expect(buildScene({ frames: [planning] }).sensorRings).toEqual([])
+    expect(buildScene({ frames: [planning], sensors }).sensorRings).toEqual([{ kind: 'passive', radiusUnits: 7000 }])
+    expect(buildScene({ frames: [planning], sensors, draftSensor: 'activePulse' }).sensorRings).toEqual([
+      { kind: 'passive', radiusUnits: 7000 }, { kind: 'pulse-preview', radiusUnits: 10_000 },
+    ])
+    const tracking = frameAt(12, { x: 3500, y: 10_500 }, [], { sensor: 'tracking', clocks: { laserReadyTick: 0, missileReadyTick: 0, trackingUntilTick: 21, exposureUntilTick: 31 } })
+    expect(buildScene({ frames: [tracking], sensors }).sensorRings).toEqual([{ kind: 'tracking', radiusUnits: 10_000 }])
+    expect(buildScene({ frames: [frameAt(12, { x: 3500, y: 10_500 }, [], { status: 'destroyed' })], sensors }).sensorRings).toEqual([])
+  })
+
+  it('reports actual cloak and exposure at the shown frame, not the request', () => {
+    const cloaked = buildScene({ frames: [frameAt(0, { x: 3500, y: 10_500 })] }).ownShip
+    expect(cloaked).toMatchObject({ cloaked: true, exposed: false })
+    const exposed = frameAt(12, { x: 3500, y: 10_500 }, [], {
+      cloak: { requested: true, actual: false, state: 'latched-activity' },
+      clocks: { laserReadyTick: 0, missileReadyTick: 0, trackingUntilTick: 21, exposureUntilTick: 31 },
+    })
+    expect(buildScene({ frames: [exposed] }).ownShip).toMatchObject({ cloaked: false, exposed: true })
+    const expired = frameAt(31, { x: 3500, y: 10_500 }, [], { cloak: { requested: false, actual: false, state: 'off' }, clocks: { laserReadyTick: 0, missileReadyTick: 0, trackingUntilTick: 21, exposureUntilTick: 31 } })
+    expect(buildScene({ frames: [expired] }).ownShip).toMatchObject({ cloaked: false, exposed: false })
   })
 })
 

@@ -37,7 +37,7 @@ test('opens in genuine turn-1 planning with own data only and a deliberate Commi
   await expect(page.locator('canvas')).toHaveCount(1)
 
   const own = page.getByRole('region', { name: 'Own ship', exact: true })
-  await expect(own.locator('dd')).toHaveText(['100.0 / 100.0', '40 / 40', '100 / 100', '6 / 6', 'Passive', 'On'])
+  await expect(own.locator('dd')).toHaveText(['100.0 / 100.0', '40 / 40', '100 / 100', '6 / 6', 'Passive', 'On', 'Not exposed'])
   const readout = page.locator('#plot-readout')
   await expect(readout).toContainText('Positioncolumn 3, row 10')
   await expect(readout).toContainText('No contacts.')
@@ -82,7 +82,7 @@ test('gives the battlefield the dominant share of a 1366x768 console without pag
 test('keyboard reaches every control in planning-flow order with a visible focus ring', async ({ page }, testInfo) => {
   await page.goto('/?seed=17')
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
-  const expected = ['Skip to orders', 'Abandon', 'Restart', 'Back', 'Play', 'Forward', 'Skip to end', 'Column', 'Row', 'Set destination', 'Hold position', 'Commit turn 1']
+  const expected = ['Skip to orders', 'Abandon', 'Restart', 'Back', 'Play', 'Forward', 'Skip to end', 'Column', 'Row', 'Set destination', 'Hold position', 'Passive', 'On', 'Commit turn 1']
 
   for (const name of expected) {
     await page.keyboard.press('Tab')

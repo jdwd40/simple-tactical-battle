@@ -1,5 +1,5 @@
 import type {
-  Cell, ContactMemory, OwnRoutePreview, Position, PublicReplayFrame, Tick, Velocity,
+  Cell, ContactMemory, OwnRoutePreview, Position, PublicReplayFrame, Ruleset, SensorOrder, Tick, Velocity,
 } from '../contracts'
 
 /**
@@ -15,6 +15,18 @@ export interface PlotContact {
   readonly uncertaintyRadiusUnits: number
   readonly velocity: Velocity | null
   readonly destroyed: boolean
+  /** Chosen in the contact list; marked on the plot with corner brackets. */
+  readonly selected: boolean
+}
+
+/**
+ * Nominal own sensor reach from the public rules: an uncloaked, stationary target in clear
+ * line of sight. It is never derived from any hidden target and guarantees no detection.
+ * `pulse-preview` is the draft's tracking reach, only if the pulse is funded.
+ */
+export interface PlotSensorRing {
+  readonly kind: 'passive' | 'tracking' | 'pulse-preview'
+  readonly radiusUnits: number
 }
 
 export type PlotPlan =
@@ -26,7 +38,12 @@ export type PlotPlan =
 
 export interface PlotScene {
   readonly tick: Tick
-  readonly ownShip: { readonly position: Position; readonly headingMilliDegrees: number; readonly destroyed: boolean }
+  readonly ownShip: {
+    readonly position: Position; readonly headingMilliDegrees: number; readonly destroyed: boolean
+    /** Actual cloak and exposure at this frame (not the request). */
+    readonly cloaked: boolean; readonly exposed: boolean
+  }
+  readonly sensorRings: readonly PlotSensorRing[]
   /** Own positions through the current frame, oldest first. */
   readonly trail: readonly Position[]
   readonly plan: PlotPlan | null
@@ -38,6 +55,12 @@ export interface SceneInput {
   readonly frames: readonly PublicReplayFrame[]
   /** Planning only. Omit during execution, assessment and replay. */
   readonly routePreview?: OwnRoutePreview | null
+  /** Public sensor rules; when given, the plot shows own sensor reach. */
+  readonly sensors?: Ruleset['sensors'] | null
+  /** Planning draft sensor order; an active pulse adds its predicted reach. */
+  readonly draftSensor?: SensorOrder | null
+  /** Alias chosen in the contact list; ignored when this frame does not know it. */
+  readonly selectedAlias?: string | null
 }
 
 const samePosition = (a: Position, b: Position) => a.x === b.x && a.y === b.y
@@ -46,7 +69,7 @@ function withStart(start: Position, waypoints: readonly Position[]): Position[] 
   return waypoints.length > 0 && samePosition(start, waypoints[0]) ? [...waypoints] : [start, ...waypoints]
 }
 
-function toPlotContact(contact: ContactMemory): PlotContact {
+function toPlotContact(contact: ContactMemory, selectedAlias: string | null): PlotContact {
   return {
     alias: contact.alias,
     kind: contact.kind,
@@ -56,10 +79,11 @@ function toPlotContact(contact: ContactMemory): PlotContact {
     uncertaintyRadiusUnits: contact.uncertaintyRadiusUnits,
     velocity: contact.estimatedVelocity ?? null,
     destroyed: contact.observedDestructionTick !== undefined,
+    selected: contact.alias === selectedAlias,
   }
 }
 
-export function buildScene({ frames, routePreview = null }: SceneInput): PlotScene {
+export function buildScene({ frames, routePreview = null, sensors = null, draftSensor = null, selectedAlias = null }: SceneInput): PlotScene {
   const current = frames.at(-1)
   if (!current) throw new Error('A plot scene needs at least the current frame')
   const own = current.observation.ownShip
@@ -81,12 +105,27 @@ export function buildScene({ frames, routePreview = null }: SceneInput): PlotSce
     plan = { kind: 'committed', destination: own.destination, path: withStart(own.position, remaining) }
   }
 
+  const destroyed = own.status === 'destroyed'
+  const sensorRings: PlotSensorRing[] = []
+  if (sensors && !destroyed) {
+    sensorRings.push(own.sensor === 'tracking'
+      ? { kind: 'tracking', radiusUnits: sensors.activeUncloakedRangeUnits }
+      : { kind: 'passive', radiusUnits: sensors.passiveUncloakedRangeUnits })
+    if (draftSensor === 'activePulse' && own.sensor !== 'tracking') {
+      sensorRings.push({ kind: 'pulse-preview', radiusUnits: sensors.activeUncloakedRangeUnits })
+    }
+  }
+
   return {
     tick: current.tick,
-    ownShip: { position: own.position, headingMilliDegrees: own.headingMilliDegrees, destroyed: own.status === 'destroyed' },
+    ownShip: {
+      position: own.position, headingMilliDegrees: own.headingMilliDegrees, destroyed,
+      cloaked: own.cloak.actual, exposed: own.clocks.exposureUntilTick > current.tick,
+    },
     trail,
     plan,
-    contacts: current.observation.contacts.map(toPlotContact),
+    contacts: current.observation.contacts.map((contact) => toPlotContact(contact, selectedAlias)),
+    sensorRings,
   }
 }
 

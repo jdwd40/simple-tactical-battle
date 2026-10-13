@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { Cell, GameController, GameView, MovementOrder } from '../../contracts'
+import type { Cell, GameController, GameView, MovementOrder, SensorOrder } from '../../contracts'
 import { buildScene } from '../../rendering/plotScene'
 import { ConsoleButton } from '../components/ConsoleButton'
 import { Panel } from '../components/Panel'
@@ -15,6 +15,8 @@ import { presentGameView } from '../gameplay/viewAdapters'
 import { assessmentLines } from './consoleText'
 import { EventLog } from './EventLog'
 import { OwnShipStatus } from './OwnShipStatus'
+import { SystemOrders } from './SystemOrders'
+import type { OrderCapabilities } from './systemsText'
 import './game.css'
 
 const TURN_PHASES = ['Planning', 'Commit', 'Execution', 'Assessment'] as const
@@ -36,16 +38,26 @@ function announcement(view: GameView, turn: number) {
   }
 }
 
+export interface GameConsoleProps {
+  readonly controller: GameController
+  /** Order kinds the running engine performs, as plain booleans from the composition root. */
+  readonly capabilities: OrderCapabilities
+}
+
 /**
  * The playable console. It sees only the public GameController: published immutable views
  * in, typed commands out. No engine, private state or future frames are reachable here.
  */
-export function GameConsole({ controller }: { controller: GameController }) {
+export function GameConsole({ controller, capabilities }: GameConsoleProps) {
   const view = useSyncExternalStore(controller.subscribe, controller.getView, controller.getView)
   const presentation = useMemo(() => presentGameView(view), [view])
+  // Contact choice is encounter-local and only marks aliases the shown frame knows.
+  const [selection, setSelection] = useState<{ readonly encounterId: string; readonly alias: string } | null>(null)
+  const selectedAlias = selection?.encounterId === view.encounterId ? selection.alias : null
+  const draftSensor = view.phase === 'planning' ? view.draft.sensor : null
   const scene = useMemo(
-    () => buildScene({ frames: presentation.frames, routePreview: presentation.routePreview }),
-    [presentation.frames, presentation.routePreview],
+    () => buildScene({ frames: presentation.frames, routePreview: presentation.routePreview, sensors: view.rules.sensors, draftSensor, selectedAlias }),
+    [presentation.frames, presentation.routePreview, view.rules.sensors, draftSensor, selectedAlias],
   )
   const [pointerCell, setPointerCell] = useState<Cell | null>(null)
   const planNextRef = useRef<HTMLButtonElement>(null)
@@ -67,6 +79,17 @@ export function GameConsole({ controller }: { controller: GameController }) {
   const setMovement = (movement: MovementOrder) => {
     if (view.phase === 'planning') controller.setDraft({ ...view.draft, movement })
   }
+  const setSystems = (change: { readonly sensor?: SensorOrder; readonly cloak?: boolean }) => {
+    if (view.phase === 'planning') controller.setDraft({ ...view.draft, ...change })
+  }
+  const selectContact = (alias: string) => {
+    setSelection(selectedAlias === alias ? null : { encounterId: view.encounterId, alias })
+  }
+  const pulseUnavailableReason = !own.equipment.activeSensor ? 'This ship has no active sensor.'
+    : capabilities.activePulse ? null : 'Active pulse is not available in this version yet; sensors stay passive.'
+  const preview = presentation.routePreview
+  const moving = preview?.kind === 'destination'
+    && (preview.nominalReachablePoint.x !== own.position.x || preview.nominalReachablePoint.y !== own.position.y)
 
   const orders = view.phase === 'planning' ? view.draft : view.phase === 'terminal' ? null : view.lockedOwnOrders
   const canCommit = view.phase === 'planning' && view.validation.structurallyValid
@@ -89,16 +112,28 @@ export function GameConsole({ controller }: { controller: GameController }) {
         lockedReason={presentation.lockedReason}
         onMovementIntent={setMovement}
       />
-      <div className="mt-4">
-        <Readouts items={[
-          { label: 'Sensor', value: 'Passive' },
-          { label: 'Cloak', value: orders.cloak ? 'On' : 'Off' },
-          { label: 'Weapon', value: 'Hold fire' },
-        ]} />
+      <div className="orders-section">
+        <SystemOrders
+          orders={orders}
+          own={own}
+          tick={view.frame.tick}
+          ticksResolved={presentation.replay ? view.frame.tick - presentation.replay.startTick : 0}
+          rules={rules}
+          issues={presentation.issues}
+          pulseUnavailableReason={pulseUnavailableReason}
+          moving={moving}
+          lockedReason={presentation.lockedReason}
+          onChange={setSystems}
+        />
       </div>
-      <p className="order-note">
-        Movement drill: sensor, cloak and weapon orders are fixed here and arrive in later versions. The patrol follows a set route and cannot fire.
-      </p>
+      <div className="orders-section">
+        <Readouts items={[{ label: 'Weapon', value: 'Hold fire' }]} />
+        <p className="order-note">
+          {capabilities.activePulse
+            ? 'Weapons hold fire in this version; combat and a reactive patrol come later. The patrol follows a set route and cannot fire.'
+            : 'Weapons hold fire in this version; active scans, combat and a reactive patrol come later. The patrol follows a set route and cannot fire.'}
+        </p>
+      </div>
     </Panel>
   )
 
@@ -120,7 +155,7 @@ export function GameConsole({ controller }: { controller: GameController }) {
         {view.phase === 'assessment' && (
           <Panel title={`Turn ${turn} assessment`}>
             <ul className="assessment-lines">
-              {assessmentLines(view.assessment, { rules, map }).map((line) => <li key={line}>{line}</li>)}
+              {assessmentLines(view.assessment, { rules, map }, view.replay.startTick).map((line) => <li key={line}>{line}</li>)}
             </ul>
             <div className="assessment-actions">
               <ConsoleButton ref={planNextRef} variant="commit" onClick={() => controller.finishAssessment()}>Plan turn {turn + 1}</ConsoleButton>
@@ -175,7 +210,7 @@ export function GameConsole({ controller }: { controller: GameController }) {
             </dl>
             <PhaseTrack phases={TURN_PHASES} current={PHASE_LABEL[view.phase]} />
             <div className="ml-auto flex flex-wrap items-center gap-3">
-              <StatusTag>Movement drill</StatusTag>
+              <StatusTag>{capabilities.activePulse ? 'Sensor drill' : 'Movement drill'}</StatusTag>
               <div role="group" aria-label="Encounter" className="flex gap-2">
                 <ConsoleButton variant="quiet" unavailable={view.phase === 'terminal'} aria-describedby="encounter-help" onClick={() => controller.abandon()}>Abandon</ConsoleButton>
                 <ConsoleButton variant="quiet" aria-describedby="encounter-help" onClick={() => controller.restart({ kind: 'same-seed' })}>Restart</ConsoleButton>
@@ -187,10 +222,13 @@ export function GameConsole({ controller }: { controller: GameController }) {
         shipRail={
           <>
             <Panel title="Own ship" status={view.phase === 'execution' || view.phase === 'assessment' ? <StatusTag>At playback time</StatusTag> : undefined}>
-              <OwnShipStatus ship={own} />
+              <OwnShipStatus ship={own} tick={view.frame.tick} rules={rules} />
             </Panel>
             <Panel title="Plot readout">
-              <PlotReadout id="plot-readout" scene={scene} map={map} rules={rules} pointerCell={presentation.editable ? pointerCell : null} />
+              <PlotReadout
+                id="plot-readout" scene={scene} map={map} rules={rules}
+                pointerCell={presentation.editable ? pointerCell : null} onSelectContact={selectContact}
+              />
             </Panel>
           </>
         }

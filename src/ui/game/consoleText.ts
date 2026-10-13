@@ -24,10 +24,23 @@ const CLOAK_STATE: Record<CloakObservation['state'], string> = {
 }
 export const cloakText = (cloak: CloakObservation) => CLOAK_STATE[cloak.state]
 
+/** Cloak transitions as the log reports them, saying how a requested cloak comes back. */
+const CLOAK_EVENT: Record<CloakObservation['state'], string> = {
+  off: 'Cloak off.',
+  active: 'Cloak engaged.',
+  'suppressed-exposure': 'Cloak held off while your ship is exposed.',
+  'latched-activity': 'Cloak broken by your scan or shot; it stays off until you request it again.',
+  'latched-unfunded': 'Cloak upkeep ran out of energy; it stays off until you request it again.',
+}
+
+const ENERGY_REASON: Record<Extract<VisibleEvent, { kind: 'own-energy' }>['reason'], string> = {
+  regeneration: 'recharge', cloak: 'cloak upkeep', pulse: 'active pulse', propulsion: 'propulsion', laser: 'laser', missile: 'missile',
+}
+
 const INTERRUPTION: Record<Extract<VisibleEvent, { kind: 'own-interruption' }>['reason'], string> = {
   'propulsion-unfunded': 'Propulsion paused: not enough energy',
   'cloak-unfunded': 'Cloak failed: not enough energy',
-  'pulse-unfunded': 'Active pulse failed: not enough energy',
+  'pulse-unfunded': 'Active pulse failed: not enough energy, so no scan and no exposure',
 }
 export const interruptionText = (reason: keyof typeof INTERRUPTION) => INTERRUPTION[reason]
 
@@ -37,10 +50,10 @@ export function eventText(event: VisibleEvent, context: TextContext): string {
     case 'contact-acquired': return `${event.contact.alias} detected at ${cellText(event.contact.measurement.position, context)}.`
     case 'contact-updated': return `${event.contact.alias} measured at ${cellText(event.contact.measurement.position, context)}.`
     case 'contact-lost': return `Lost ${event.contact.alias}; last seen at ${cellText(event.contact.measurement.position, context)}.`
-    case 'contact-expired': return `Memory of ${event.alias} expired.`
+    case 'contact-expired': return `Memory of ${event.alias} expired after ${context.rules.timing.contactMemoryTicks * context.rules.timing.tickMs / 1000} s unseen.`
     case 'own-interruption': return `${interruptionText(event.reason)}.`
-    case 'own-cloak': return `Cloak: ${cloakText(event.cloak).toLowerCase()}.`
-    case 'own-energy': return `Energy ${event.deltaMilli >= 0 ? '+' : '−'}${energyText(Math.abs(event.deltaMilli))} (${event.reason}).`
+    case 'own-cloak': return CLOAK_EVENT[event.cloak.state]
+    case 'own-energy': return `Energy ${event.deltaMilli >= 0 ? '+' : '−'}${energyText(Math.abs(event.deltaMilli))} (${ENERGY_REASON[event.reason]}).`
     case 'own-ammunition': return `Missiles ${event.delta >= 0 ? '+' : '−'}${Math.abs(event.delta)}.`
     case 'own-shot': return `Fired ${event.weapon.kind} from ${cellText(event.position, context)}.`
     case 'observed-shot': return `${event.sourceAlias} fired a ${event.weapon} from ${cellText(event.position, context)}.`
@@ -57,7 +70,7 @@ export function eventText(event: VisibleEvent, context: TextContext): string {
 }
 
 /** Concise own-ship consequences of the assessed turn, for the assessment panel. */
-export function assessmentLines(assessment: OwnAssessment, context: TextContext): string[] {
+export function assessmentLines(assessment: OwnAssessment, context: TextContext, turnStartTick = assessment.revealTick - context.rules.timing.turnTicks): string[] {
   const lines: string[] = []
   const start = cellText(assessment.startPosition, context)
   const end = cellText(assessment.endPosition, context)
@@ -77,6 +90,25 @@ export function assessmentLines(assessment: OwnAssessment, context: TextContext)
   for (const reason of new Set(assessment.interruptions.map((interruption) => interruption.reason))) {
     const count = assessment.interruptions.filter((interruption) => interruption.reason === reason).length
     lines.push(`${interruptionText(reason)} (${count} time${count === 1 ? '' : 's'}).`)
+  }
+  const { rules } = context
+  const seconds = (ticks: number) => `${((ticks * rules.timing.tickMs) / 1000).toFixed(1)} s`
+  const sensor = assessment.sensorAttempt
+  if (sensor.kind === 'succeeded') {
+    lines.push(`Active pulse succeeded: tracking for ${seconds(rules.timing.trackingTicks)}, and your ship was exposed for ${seconds(rules.timing.exposureTicks)}.`)
+  } else if (sensor.kind === 'failed') {
+    lines.push(sensor.reason === 'insufficient-energy'
+      ? 'Active pulse failed on the first tick for lack of energy. It did not retry and did not expose you.'
+      : 'Active pulse not made: your ship was destroyed.')
+  }
+  const latched = assessment.events.filter((event) => event.kind === 'own-cloak').map((event) => event.cloak.state)
+  if (latched.includes('latched-activity')) lines.push('Your scan or shot broke cloak for the rest of the turn. Request it again when planning.')
+  else if (latched.includes('latched-unfunded')) lines.push('Cloak stays off until you request it again when planning.')
+  for (const event of assessment.events) {
+    const at = seconds(event.tick - turnStartTick)
+    if (event.kind === 'contact-acquired') lines.push(`${event.contact.alias} detected at ${at}.`)
+    else if (event.kind === 'contact-lost') lines.push(`${event.contact.alias} lost at ${at}; now a last-known position.`)
+    else if (event.kind === 'contact-expired') lines.push(`Memory of ${event.alias} expired at ${at}.`)
   }
   const current = assessment.contacts.filter((contact) => contact.kind === 'current').length
   const stale = assessment.contacts.length - current

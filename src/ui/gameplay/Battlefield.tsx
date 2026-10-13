@@ -78,7 +78,7 @@ export function Battlefield({ encounterId, map, rules, scene, playback, selectab
       : scene.tick === previous.tick + 1 ? { from: previous, durationMs: rules.timing.tickMs / playback.speed }
         : scene.tick === previous.tick ? 'continue' as const
           : null
-    renderer.update({ map, unitsPerCell: rules.geometry.unitsPerCell, scene, smoothing, selectable })
+    renderer.update({ map, unitsPerCell: rules.geometry.unitsPerCell, tickMs: rules.timing.tickMs, scene, smoothing, selectable })
     previousSceneRef.current = scene
   }, [ready, encounterId, map, rules, scene, playback, selectable, reducedMotion])
 

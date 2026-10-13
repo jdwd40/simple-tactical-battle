@@ -13,5 +13,5 @@ if (import.meta.env.DEV) (window as unknown as { __plotDiagnostics: typeof rende
 export default function App() {
   const [controller] = useState(() => createGameController({ seed: seedFromSearch(window.location.search) ?? randomSeed(), newSeed: randomSeed }))
   useEffect(() => () => controller.dispose(), [controller])
-  return <GameConsole controller={controller} />
+  return <GameConsole controller={controller} capabilities={controller.capabilities} />
 }

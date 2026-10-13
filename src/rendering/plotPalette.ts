@@ -1,6 +1,6 @@
 /**
  * Pixi colours mirroring the console tokens in src/styles.css. Hue carries the same
- * meaning as in the DOM (amber = own, coral = hostile); line style carries it without
+ * meaning as in the DOM (amber = own, coral = hostile, sea-glass = sensors); line style carries it without
  * colour (solid = measured/known, dashed = predicted, stale or uncertain).
  */
 export const PLOT_COLOURS = {
@@ -15,6 +15,7 @@ export const PLOT_COLOURS = {
   command: 0xf0b44a,
   commandInk: 0x1b1407,
   hostile: 0xef9078,
+  sonar: 0x86c9bd,
 } as const
 
 export const PLOT_FONT = '"Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif'

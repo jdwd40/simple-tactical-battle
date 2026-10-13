@@ -33,10 +33,24 @@ const MESSAGES: Record<Code, (details: Details, context: { tickMs: number; tick:
     ? `Needs ${energy(requiredEnergyMilli)} energy; ${energy(availableEnergyMilli)} available now.`
     : 'Waits until enough energy is available.',
   'propulsion-funding': () => 'Movement pauses on any tick without propulsion energy.',
-  'cloak-exposure': () => 'Cloak engages only after the current exposure ends.',
+  'cloak-exposure': ({ readyTick }, { tickMs, tick }) => readyTick !== undefined && readyTick > tick
+    ? `Cloak engages only once your exposure ends, in ${seconds(readyTick - tick, tickMs)}, and only if funded.`
+    : 'Cloak engages only after the current exposure ends.',
   'activity-breaks-cloak': () => 'A successful scan or shot breaks cloak until a later turn.',
 }
 
 export function issueMessage(issue: ValidationIssue, context: { tickMs: number; tick: Tick }): string {
+  // A pulse never waits: it is attempted once on the first tick and fails if unfunded.
+  if (issue.field === 'sensor' && issue.code === 'awaiting-energy') {
+    const { requiredEnergyMilli, availableEnergyMilli } = issue.details ?? {}
+    return requiredEnergyMilli !== undefined && availableEnergyMilli !== undefined
+      ? `The pulse needs ${energy(requiredEnergyMilli)} energy on the first tick; ${energy(availableEnergyMilli)} would be available. It would fail once, without exposing you.`
+      : 'The pulse would fail for lack of energy on the first tick, without exposing you.'
+  }
   return MESSAGES[issue.code](issue.details ?? {}, context)
+}
+
+/** Word for the severity; a conditional pulse is a forecast failure, not a wait. */
+export function severityLabel(issue: ValidationIssue): string {
+  return issue.field === 'sensor' && issue.severity === 'conditional' ? 'Will fail' : SEVERITY_LABEL[issue.severity]
 }

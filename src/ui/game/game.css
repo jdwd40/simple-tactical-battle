@@ -8,3 +8,50 @@
 .event-list { display: grid; gap: 0.375rem; margin: 0; padding: 0; list-style: none; }
 .event-item { display: grid; grid-template-columns: 3.25rem 1fr; gap: 0.5rem; color: var(--color-ink-muted); }
 .event-time { color: var(--color-ink-faint); font-size: var(--text-meta); line-height: var(--text-body--line-height); text-align: right; }
+
+/* Orders sub-sections: movement, then sensor/cloak systems, then weapon. */
+.orders-section { margin-top: 1rem; padding-top: 0.875rem; border-top: 1px solid var(--color-seam); }
+
+/* Segmented radio choice (sensor, cloak). Checked = amber underline; locked = dashed edges. */
+.segmented { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin: 0; padding: 0; border: 0; }
+.segmented + .segmented, .system-effects + .segmented { margin-top: 0.875rem; }
+.segmented-legend { float: left; padding: 0; font-weight: 600; }
+.segmented-options { display: flex; }
+.segmented-option { position: relative; }
+.segmented-option input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.segmented-option span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-edge);
+  margin-left: -1px;
+  color: var(--color-ink-muted);
+  font-weight: 500;
+}
+.segmented-option input:checked + span {
+  border-color: var(--color-command);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: inset 0 -3px 0 var(--color-command);
+  position: relative;
+}
+.segmented-option input:focus-visible + span { outline: 2px solid var(--color-command); outline-offset: 2px; position: relative; z-index: 1; }
+.segmented:disabled .segmented-option span,
+.segmented-option[data-unavailable] span { border-style: dashed; }
+.segmented:disabled .segmented-option input,
+.segmented-option[data-unavailable] input { cursor: not-allowed; }
+.segmented-option[data-unavailable] span { color: var(--color-ink-faint); }
+
+.system-effects {
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-top: 0.5rem;
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+}
+.system-effects dd { font-weight: 500; }
+.system-progress { color: var(--color-ink); }
+.system-hint { color: var(--color-command); }
+.system-warning { display: flex; gap: 0.5rem; align-items: baseline; color: var(--color-command); }
+.system-warning-glyph { flex: none; width: 0.5rem; height: 0.5rem; border: 1.5px solid currentColor; transform: rotate(45deg); }
+.energy-plan { margin-top: 0.875rem; }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ValidationIssue } from '../../contracts'
-import { issueMessage } from './validationText'
+import { issueMessage, severityLabel } from './validationText'
 
 const codes: ValidationIssue[] = [
   ...(['invalid-shape', 'invalid-turn', 'out-of-bounds', 'obstacle', 'unreachable', 'unknown-alias', 'equipment-unavailable', 'no-ammunition', 'observed-opponent-destroyed'] as const)
@@ -20,5 +20,17 @@ describe('validation messages', () => {
     expect(issueMessage({ field: 'movement', severity: 'error', code: 'obstacle', details: { cell: { column: 7, row: 4 } } }, context)).toBe('Column 7, row 4 is an asteroid. Choose open space.')
     expect(issueMessage({ field: 'weapon', severity: 'conditional', code: 'awaiting-cooldown', details: { readyTick: 65 } }, context)).toBe('Fires once the weapon has cooled down, in 2.5 s.')
     expect(issueMessage({ field: 'weapon', severity: 'conditional', code: 'awaiting-energy', details: { requiredEnergyMilli: 18_000, availableEnergyMilli: 12_400 } }, context)).toBe('Needs 18 energy; 12 available now.')
+  })
+
+  it('describes a pulse energy forecast as a one-off failure, not a wait', () => {
+    const issue: ValidationIssue = { field: 'sensor', severity: 'conditional', code: 'awaiting-energy', details: { requiredEnergyMilli: 12_000, availableEnergyMilli: 9_800 } }
+    expect(issueMessage(issue, { tickMs: 100, tick: 0 })).toBe('The pulse needs 12 energy on the first tick; 9 would be available. It would fail once, without exposing you.')
+    expect(severityLabel(issue)).toBe('Will fail')
+    expect(severityLabel({ field: 'weapon', severity: 'conditional', code: 'awaiting-energy' })).toBe('Waits')
+  })
+
+  it('times a cloak held off by exposure from the supplied ready tick', () => {
+    expect(issueMessage({ field: 'cloak', severity: 'conditional', code: 'cloak-exposure', details: { readyTick: 130 } }, { tickMs: 100, tick: 100 }))
+      .toBe('Cloak engages only once your exposure ends, in 3.0 s, and only if funded.')
   })
 })

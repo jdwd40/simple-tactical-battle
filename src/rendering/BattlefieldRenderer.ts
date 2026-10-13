@@ -5,7 +5,7 @@ import { PLOT_COLOURS, PLOT_FONT } from './plotPalette'
 import {
   cellAtScreen, cellRect, fitPlot, headingToRotation, toScreen, type PlotTransform, type ScreenPoint,
 } from './plotGeometry'
-import { interpolateScene, splitPathAt, type PlotContact, type PlotScene } from './plotScene'
+import { interpolateScene, splitPathAt, type PlotContact, type PlotScene, type PlotSensorRing } from './plotScene'
 
 export interface RendererCallbacks {
   onHoverCell(cell: Cell | null): void
@@ -15,6 +15,8 @@ export interface RendererCallbacks {
 export interface RendererFrame {
   readonly map: PublicMap
   readonly unitsPerCell: number
+  /** Public tick length, for the age shown on last-known contact labels. */
+  readonly tickMs: number
   readonly scene: PlotScene
   /**
    * Animate from an earlier scene (exactly one tick before) over the duration. `continue`
@@ -41,9 +43,12 @@ export interface DrawSummary {
   readonly cellPx: number
   readonly origin: ScreenPoint
   readonly ownShip: ScreenPoint
+  /** Own ship marker state drawn: cloaked (dashed hull ring), exposed (labelled) or plain. */
+  readonly ownState: 'cloaked' | 'exposed' | 'plain' | 'destroyed'
   readonly trailPoints: number
   readonly plan: string | null
-  readonly contacts: readonly { readonly alias: string; readonly kind: string; readonly at: ScreenPoint; readonly radiusPx: number }[]
+  readonly sensorRings: readonly { readonly kind: PlotSensorRing['kind']; readonly radiusPx: number }[]
+  readonly contacts: readonly { readonly alias: string; readonly kind: string; readonly at: ScreenPoint; readonly radiusPx: number; readonly selected: boolean; readonly label: string }[]
 }
 
 const counters = { created: 0, destroyed: 0 }
@@ -52,6 +57,20 @@ let lastSummary: DrawSummary | null = null
 export function rendererDiagnostics(): RendererDiagnostics {
   return { ...counters, live: counters.created - counters.destroyed, last: lastSummary }
 }
+
+const RING_STYLE: Record<PlotSensorRing['kind'], { dash: number; gap: number; width: number; alpha: number; label: string }> = {
+  passive: { dash: 2, gap: 6, width: 1.25, alpha: 0.55, label: 'Passive reach (nominal)' },
+  tracking: { dash: 8, gap: 4, width: 1.75, alpha: 0.9, label: 'Tracking reach (nominal)' },
+  'pulse-preview': { dash: 5, gap: 6, width: 1.5, alpha: 0.7, label: 'Pulse reach if funded' },
+}
+
+interface Bounds { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }
+const mapBounds = (transform: PlotTransform): Bounds => ({
+  left: transform.originX, top: transform.originY,
+  right: transform.originX + transform.columns * transform.cellPx,
+  bottom: transform.originY + transform.rows * transform.cellPx,
+})
+const insideBounds = (bounds: Bounds, x: number, y: number) => x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom
 
 const LABEL_STYLE: TextStyleOptions = { fontFamily: PLOT_FONT, fontSize: 13, fontWeight: '500', fill: PLOT_COLOURS.inkMuted }
 
@@ -107,6 +126,7 @@ export class BattlefieldRenderer {
   private readonly layers = {
     terrain: new Graphics(),
     terrainLabels: new Container(),
+    sensors: new Graphics(),
     plan: new Graphics(),
     contacts: new Graphics(),
     ship: new Graphics(),
@@ -144,8 +164,8 @@ export class BattlefieldRenderer {
     canvas.setAttribute('aria-hidden', 'true')
     canvas.style.display = 'block'
     host.appendChild(canvas)
-    const { terrain, terrainLabels, plan, contacts, ship, hover, labels } = this.layers
-    app.stage.addChild(terrain, terrainLabels, plan, contacts, hover, ship, labels)
+    const { terrain, terrainLabels, sensors, plan, contacts, ship, hover, labels } = this.layers
+    app.stage.addChild(terrain, terrainLabels, sensors, plan, contacts, hover, ship, labels)
     this.terrainLabels = new LabelPool(terrainLabels)
     this.labels = new LabelPool(labels)
 
@@ -284,9 +304,10 @@ export class BattlefieldRenderer {
     const labels = this.labels
     if (!app || !transform || !labels) return
     labels.begin()
+    const sensorRings = this.drawSensorRings(scene, transform, labels)
     this.drawPlan(scene, transform, labels)
-    const contacts = this.drawContacts(scene.contacts, transform, labels)
-    const ship = this.drawShip(scene, transform)
+    const contacts = this.drawContacts(scene.contacts, transform, labels, this.frame?.tickMs ?? 100)
+    const { at: ship, state: ownState } = this.drawShip(scene, transform, labels)
     labels.end()
     app.render()
 
@@ -297,10 +318,39 @@ export class BattlefieldRenderer {
       cellPx: transform.cellPx,
       origin: { x: transform.originX, y: transform.originY },
       ownShip: ship,
+      ownState,
       trailPoints: scene.trail.length,
       plan: scene.plan?.kind ?? null,
+      sensorRings,
       contacts,
     }
+  }
+
+  /** Own sensor reach as dotted/dashed sea-glass rings, clipped to the public map. */
+  private drawSensorRings(scene: PlotScene, transform: PlotTransform, labels: LabelPool) {
+    const g = this.layers.sensors.clear()
+    const at = toScreen(transform, scene.ownShip.position)
+    const bounds = mapBounds(transform)
+    const drawn: DrawSummary['sensorRings'][number][] = []
+    for (const ring of scene.sensorRings) {
+      const radiusPx = ring.radiusUnits * transform.scale
+      const style = RING_STYLE[ring.kind]
+      for (const [start, end] of dashCircle(radiusPx, style.dash, style.gap)) {
+        const mid = (start + end) / 2
+        if (!insideBounds(bounds, at.x + Math.cos(mid) * radiusPx, at.y + Math.sin(mid) * radiusPx)) continue
+        g.moveTo(at.x + Math.cos(start) * radiusPx, at.y + Math.sin(start) * radiusPx).arc(at.x, at.y, radiusPx, start, end)
+      }
+      g.stroke({ width: style.width, color: PLOT_COLOURS.sonar, alpha: style.alpha, cap: 'round' })
+      // Label the ring where it is on the map: above, below, left or right of the ship.
+      const spots = ring.kind === 'pulse-preview'
+        ? [{ x: at.x, y: at.y + radiusPx + 9, ax: 0.5 }, { x: at.x, y: at.y - radiusPx - 9, ax: 0.5 }]
+        : [{ x: at.x, y: at.y - radiusPx - 9, ax: 0.5 }, { x: at.x, y: at.y + radiusPx + 9, ax: 0.5 }]
+      spots.push({ x: at.x + radiusPx + 6, y: at.y - 12, ax: 0 }, { x: at.x - radiusPx - 6, y: at.y - 12, ax: 1 })
+      const spot = spots.find((candidate) => insideBounds(bounds, candidate.x, candidate.y))
+      if (spot) labels.place(`ring:${ring.kind}`, style.label, spot.x, spot.y, PLOT_COLOURS.sonar, spot.ax)
+      drawn.push({ kind: ring.kind, radiusPx })
+    }
+    return drawn
   }
 
   private drawPlan(scene: PlotScene, transform: PlotTransform, labels: LabelPool) {
@@ -348,15 +398,11 @@ export class BattlefieldRenderer {
     labels.place('nominal', 'Turn end (predicted)', nominal.x + 9, nominal.y + 12, PLOT_COLOURS.command)
   }
 
-  private drawContacts(contacts: readonly PlotContact[], transform: PlotTransform, labels: LabelPool) {
+  private drawContacts(contacts: readonly PlotContact[], transform: PlotTransform, labels: LabelPool, tickMs: number) {
     const g = this.layers.contacts.clear()
     const size = Math.max(7, transform.cellPx * 0.3)
-    const bounds = {
-      left: transform.originX, top: transform.originY,
-      right: transform.originX + transform.columns * transform.cellPx,
-      bottom: transform.originY + transform.rows * transform.cellPx,
-    }
-    const inside = (x: number, y: number) => x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom
+    const bounds = mapBounds(transform)
+    const inside = (x: number, y: number) => insideBounds(bounds, x, y)
     const drawn: DrawSummary['contacts'][number][] = []
 
     for (const contact of contacts) {
@@ -407,15 +453,27 @@ export class BattlefieldRenderer {
           .moveTo(at.x + size, at.y - size).lineTo(at.x - size, at.y + size)
           .stroke({ width: 2, color: PLOT_COLOURS.ink })
       }
+      if (contact.selected) {
+        // Selection: corner brackets, a shape cue independent of colour and contact state.
+        const r = size + 6
+        const arm = Math.max(4, size * 0.6)
+        for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+          g.moveTo(at.x + sx * r, at.y + sy * (r - arm)).lineTo(at.x + sx * r, at.y + sy * r).lineTo(at.x + sx * (r - arm), at.y + sy * r)
+        }
+        g.stroke({ width: 2, color: PLOT_COLOURS.ink, join: 'miter' })
+      }
 
-      const status = contact.destroyed ? 'destroyed' : contact.kind === 'current' ? 'current' : 'last known'
-      labels.place(`contact:${contact.alias}`, `${contact.alias} (${status})`, at.x + size + 5, at.y - size - 2, PLOT_COLOURS.hostile)
-      drawn.push({ alias: contact.alias, kind: contact.kind, at, radiusPx })
+      const status = contact.destroyed ? 'destroyed'
+        : contact.kind === 'current' ? 'current'
+          : `last known, ${((contact.ageTicks * tickMs) / 1000).toFixed(1)} s ago`
+      const label = `${contact.alias} (${status})`
+      labels.place(`contact:${contact.alias}`, label, at.x + size + 5, at.y - size - 2, PLOT_COLOURS.hostile)
+      drawn.push({ alias: contact.alias, kind: contact.kind, at, radiusPx, selected: contact.selected, label })
     }
     return drawn
   }
 
-  private drawShip(scene: PlotScene, transform: PlotTransform): ScreenPoint {
+  private drawShip(scene: PlotScene, transform: PlotTransform, labels: LabelPool): { at: ScreenPoint; state: DrawSummary['ownState'] } {
     const g = this.layers.ship.clear()
     const at = toScreen(transform, scene.ownShip.position)
     const length = Math.max(18, transform.cellPx * 0.9)
@@ -432,12 +490,22 @@ export class BattlefieldRenderer {
       g.moveTo(at.x - length / 2, at.y - length / 2).lineTo(at.x + length / 2, at.y + length / 2)
         .moveTo(at.x + length / 2, at.y - length / 2).lineTo(at.x - length / 2, at.y + length / 2)
         .stroke({ width: 2, color: PLOT_COLOURS.ink })
-    } else {
-      // Ring marks the hull extent so the ship never reads as the arrowhead of its own trail.
-      g.circle(at.x, at.y, length * 0.62).stroke({ width: 1.5, color: PLOT_COLOURS.command, alpha: 0.9 })
-      g.poly(points, true).fill({ color: PLOT_COLOURS.command }).stroke({ width: 1.5, color: PLOT_COLOURS.commandInk })
+      return { at, state: 'destroyed' }
     }
-    return at
+    // Ring marks the hull extent so the ship never reads as the arrowhead of its own trail.
+    // Cloaked: dashed ring plus a label; exposed: labelled. Both read without colour.
+    const { cloaked, exposed } = scene.ownShip
+    const radius = length * 0.62
+    if (cloaked) {
+      for (const [start, end] of dashCircle(radius, 4, 4)) g.moveTo(at.x + Math.cos(start) * radius, at.y + Math.sin(start) * radius).arc(at.x, at.y, radius, start, end)
+      g.stroke({ width: 1.5, color: PLOT_COLOURS.command, alpha: 0.9 })
+    } else {
+      g.circle(at.x, at.y, radius).stroke({ width: 1.5, color: PLOT_COLOURS.command, alpha: 0.9 })
+    }
+    g.poly(points, true).fill({ color: PLOT_COLOURS.command }).stroke({ width: 1.5, color: PLOT_COLOURS.commandInk })
+    const state = cloaked ? 'cloaked' : exposed ? 'exposed' : 'plain'
+    if (state !== 'plain') labels.place('own-state', cloaked ? 'Cloaked' : 'Exposed', at.x, at.y + radius + 10, PLOT_COLOURS.command, 0.5)
+    return { at, state }
   }
 
   private drawHover() {

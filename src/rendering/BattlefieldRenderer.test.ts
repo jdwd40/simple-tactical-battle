@@ -69,7 +69,7 @@ const from = buildScene({ frames: [frameAt(4, { x: 1000, y: 10_500 })] })
 const to = buildScene({ frames: [frameAt(5, { x: 2000, y: 10_500 })] })
 const transform = fitPlot(732, 635, DUEL_MAP, 1000)
 const screenX = (worldX: number) => toScreen(transform, { x: worldX, y: 10_500 }).x
-const frame = (scene = to, smoothing: RendererFrame['smoothing'] = null): RendererFrame => ({ map: DUEL_MAP, unitsPerCell: 1000, scene, smoothing, selectable: false })
+const frame = (scene = to, smoothing: RendererFrame['smoothing'] = null): RendererFrame => ({ map: DUEL_MAP, unitsPerCell: 1000, tickMs: 100, scene, smoothing, selectable: false })
 const drawn = () => rendererDiagnostics().last!
 
 async function startedRenderer() {

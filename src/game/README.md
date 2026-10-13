@@ -14,9 +14,14 @@ const controller = createGameController({
   engine,               // optional EngineApi (default SIMULATION_ENGINE) — wrap to count/inspect calls
   planOpponent,         // optional PlanOpponent (default scriptedPatrol, the interim drill script)
 })
-<GameConsole controller={controller} />   // UI receives only the public GameController
+<GameConsole controller={controller} capabilities={controller.capabilities} />   // public surface plus capability booleans
 controller.dispose()                       // unmount: cancels timers, pauses; commands stay usable
 ```
+
+`controller.capabilities` is the injected engine's `{ activePulse, laser, missile }`, copied as frozen
+booleans and nothing else (TSB-21). The console declares its own structural prop type and never
+imports this module; it offers the active pulse only when `activePulse` is true and the ship has an
+active sensor.
 
 The controller implements `GameController` from `src/contracts/public.ts`:
 
@@ -34,6 +39,6 @@ The controller implements `GameController` from `src/contracts/public.ts`:
 - Pass a `PlanOpponent` spy to check once-per-planning-entry planning and its inputs. TSB-40 replaces `scriptedPatrol` through the same option.
 - In the browser, `?seed=<uint32>` gives a reproducible encounter. The dev server exposes `window.__plotDiagnostics()` (drawn-plot summary only); production builds strip it.
 
-## Movement-drill limits (until TSB-20/30/40)
+## Drill limits (until TSB-30/40)
 
-`ENGINE_CAPABILITIES` has no active pulse, laser or missile, so the console fixes the sensor to passive and the weapon to hold. Cloak carries its actual state but has no control yet (TSB-21). The patrol follows a fixed public loop and cannot react or fire. There is no damage, destruction, automatic aftermath or outcome; the terminal view is reached only by abandoning.
+The console offers passive sensing, the active pulse when the engine's capability allows it, and the cloak (TSB-21); the weapon stays at hold fire while `laser` and `missile` are false. The patrol follows a fixed public loop and cannot react or fire. There is no damage, destruction, automatic aftermath or outcome; the terminal view is reached only by abandoning.
