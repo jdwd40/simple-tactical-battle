@@ -27,6 +27,8 @@ import './game.css'
 const TURN_PHASES = ['Planning', 'Commit', 'Execution', 'Assessment'] as const
 /** Combat cues stay on the plot banner and resource bars this many ticks (presentation only). */
 const COMBAT_FEED_TICKS = 25
+/** The phone layouts (portrait stack and landscape), matching the CSS breakpoints. */
+const PHONE_LAYOUT = '(max-width: 759px), (max-height: 540px) and (min-width: 560px) and (max-width: 1023px)'
 const PHASE_LABEL: Record<GameView['phase'], (typeof TURN_PHASES)[number] | undefined> = {
   planning: 'Planning', commit: 'Commit', execution: 'Execution', assessment: 'Assessment', terminal: undefined,
 }
@@ -126,6 +128,22 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
   useEffect(() => {
     if (railTop) document.getElementById('command-rail')?.scrollTo({ top: 0 })
   }, [railTop, view.encounterId])
+
+  // Phones: committing (or replaying) from further down the page brings the deck top (status
+  // strip, plot and playback) back into view so the turn can be watched. Presentation only;
+  // wider layouts and focus are left alone.
+  const watching = view.phase === 'execution'
+  useEffect(() => {
+    if (!watching || !window.matchMedia(PHONE_LAYOUT).matches) return
+    const plot = document.querySelector('.deck-plot')
+    const deck = document.querySelector('.console-deck')
+    if (!plot || !deck) return
+    const box = plot.getBoundingClientRect()
+    const visible = Math.min(box.bottom, window.innerHeight) - Math.max(box.top, 0)
+    if (visible >= box.height * 0.6) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    deck.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' })
+  }, [watching, view.encounterId])
 
   // Keep keyboard focus somewhere sensible when the control that held it disappears.
   useEffect(() => {

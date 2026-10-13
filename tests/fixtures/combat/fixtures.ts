@@ -127,3 +127,20 @@ export const CROWDED_FRAME: PublicReplayFrame = (() => {
   return { tick, observation, events: [] }
 })()
 export const cellCentreOf = (cell: { readonly column: number; readonly row: number }) => cellCentre(cell, rules)
+
+/**
+ * Two incoming hits close together for label checks (TSB-50 r0): -35 shields at tick 10, then
+ * -5 shields and -30 hull at tick 12, no attacker seen. Hand-written public frames, 0..20.
+ */
+export const HITS_END = 20
+export const HITS_FRAMES: readonly PublicReplayFrame[] = Array.from({ length: HITS_END + 1 }, (_, tick) => {
+  const base = SAMPLE_PLAYER_OBSERVATION
+  const events: VisibleEvent[] = tick === 10 ? [{ id: 't10-000', tick, kind: 'own-damage', shieldsLost: 35, hullLost: 0 }]
+    : tick === 12 ? [{ id: 't12-000', tick, kind: 'own-damage', shieldsLost: 5, hullLost: 30 }] : []
+  const shields = tick >= 12 ? 0 : tick >= 10 ? 5 : 40
+  const hull = tick >= 12 ? 70 : 100
+  return {
+    tick, events,
+    observation: { ...base, tick, events, ownShip: { ...base.ownShip, position: OWN_POSITION, shields: { current: shields, max: 40 }, hull: { current: hull, max: 100 } }, contacts: [] },
+  }
+})

@@ -827,6 +827,10 @@ export class BattlefieldRenderer {
       g.stroke({ width, color, alpha, cap: 'round' })
     }
     for (const effect of scene.effects) {
+      // Each mark's label is keyed by its own published tick, so a newer event never overwrites
+      // an older one's text (or the reverse); newer marks get the higher label priority.
+      const eventTick = scene.tick - effect.ageTicks
+      const recency = -effect.ageTicks * 0.01
       const progress = effect.ageTicks / effect.durationTicks
       const fade = Math.max(0.15, 1 - progress)
       const grow = still ? 0.5 : progress
@@ -851,7 +855,7 @@ export class BattlefieldRenderer {
           if (effect.radiusUnits > 0) g.circle(at.x, at.y, effect.radiusUnits * transform.scale).stroke({ width: 1.5, color: PLOT_COLOURS.command, alpha: 0.8 * fade })
           rays(at, cell * 0.25, cell * (0.75 + grow * 0.35), 10, PLOT_COLOURS.command, fade, 2.5)
           if (effect.ageTicks < effect.durationTicks * 0.8) {
-            labels.around('hit', `Hit: ${effect.alias}${effect.weapon === 'missile' ? ' (missile)' : ''}`, PLOT_COLOURS.ink, 88, at, ring + 2, [2, 4, 6, 0, 1])
+            labels.around(`hit@${eventTick}:${effect.alias}`, `Hit: ${effect.alias}${effect.weapon === 'missile' ? ' (missile)' : ''}`, PLOT_COLOURS.ink, 88 + recency, at, ring + 2, [2, 4, 6, 0, 1])
           }
           break
         }
@@ -862,7 +866,7 @@ export class BattlefieldRenderer {
           for (const [start, end] of dashCircle(radius, 5, 4)) g.moveTo(at.x + Math.cos(start) * radius, at.y + Math.sin(start) * radius).arc(at.x, at.y, radius, start, end)
           g.stroke({ width: 2, color: PLOT_COLOURS.ink, alpha: fade })
           rays(at, radius * 0.25, radius * (0.6 + grow * 0.3), 6, PLOT_COLOURS.ink, 0.8 * fade, 1.5)
-          if (effect.ageTicks < effect.durationTicks * 0.8) labels.around('impact', 'Impact: damage unconfirmed', PLOT_COLOURS.ink, 40, at, radius, [2, 3, 0, 1])
+          if (effect.ageTicks < effect.durationTicks * 0.8) labels.around(`impact@${eventTick}:${Math.round(at.x)},${Math.round(at.y)}`, 'Impact: damage unconfirmed', PLOT_COLOURS.ink, 40 + recency, at, radius, [2, 3, 0, 1])
           break
         }
         case 'own-hit': {
@@ -888,7 +892,7 @@ export class BattlefieldRenderer {
           }
           const parts = [effect.shieldsLost > 0 ? `−${effect.shieldsLost} shields` : '', effect.hullLost > 0 ? `−${effect.hullLost} hull` : ''].filter(Boolean)
           const lift = still ? 0 : Math.min(14, effect.ageTicks * 0.6)
-          labels.around('own-hit', `Hit ${parts.join(', ')}`, PLOT_COLOURS.ink, 95, { x: at.x, y: at.y - lift }, base + 10, [2, 4, 6, 0, 1])
+          labels.around(`own-hit@${eventTick}`, `Hit ${parts.join(', ')}`, PLOT_COLOURS.ink, 95 + recency, { x: at.x, y: at.y - lift }, base + 10, [2, 4, 6, 0, 1])
           break
         }
         case 'launch': {

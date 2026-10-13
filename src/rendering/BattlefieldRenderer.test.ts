@@ -140,3 +140,28 @@ describe('BattlefieldRenderer smoothing control', () => {
     expect(after.destroyed - before.destroyed).toBe(2)
   })
 })
+
+describe('BattlefieldRenderer combat labels', () => {
+  const damage = (tick: number, shieldsLost: number, hullLost: number) => {
+    const base = frameAt(tick, { x: 3500, y: 10_500 })
+    const events = [{ id: `t${tick}-000`, tick, kind: 'own-damage', shieldsLost, hullLost }] as unknown as typeof base.events
+    return { ...base, events, observation: { ...base.observation, events } }
+  }
+  const quiet = (tick: number) => frameAt(tick, { x: 3500, y: 10_500 })
+  const hitLabels = () => drawn().labels.filter((label) => label.key.startsWith('own-hit')).map((label) => label.text)
+
+  it('labels every recent incoming hit with its own loss, newest first, and only from its tick', async () => {
+    const renderer = await startedRenderer()
+    const frames = [quiet(9), damage(10, 35, 0), quiet(11), damage(12, 5, 30), quiet(13)]
+    renderer.update(frame(buildScene({ frames: frames.slice(0, 1) })))
+    expect(hitLabels()).toEqual([])
+    renderer.update(frame(buildScene({ frames: frames.slice(0, 3) })))
+    expect(hitLabels()).toEqual(['Hit −35 shields'])
+    renderer.update(frame(buildScene({ frames })))
+    expect(hitLabels()).toEqual(['Hit −5 shields, −30 hull', 'Hit −35 shields'])
+    // Rewind between the hits: the later one is gone again.
+    renderer.update(frame(buildScene({ frames: frames.slice(0, 3) })))
+    expect(hitLabels()).toEqual(['Hit −35 shields'])
+    renderer.dispose()
+  })
+})

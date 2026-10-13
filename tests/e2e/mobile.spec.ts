@@ -92,6 +92,37 @@ for (const phone of PHONES) {
   })
 }
 
+for (const phone of PHONES) {
+  test.describe(`${phone.name} commit from the bottom of the orders`, () => {
+    test.use({ viewport: phone.viewport, hasTouch: true, isMobile: true, deviceScaleFactor: 2 })
+
+    test('tapping Commit after scrolling down brings the plot and playback into view', async ({ page }, testInfo) => {
+      const errors = trackErrors(page)
+      await page.goto(`/?seed=${MISSION_SEED}`)
+      await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
+      await page.getByRole('button', { name: 'Begin mission' }).tap()
+      // Scroll the page to its end (the bottom of the Orders panel), then commit by tapping only.
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+      const commit = page.getByRole('button', { name: 'Commit turn 1' })
+      await expect(commit).toBeInViewport()
+      await commit.tap()
+      await expect(page.locator('[aria-current="step"]')).toHaveText('Execution')
+      // No scrolling helpers from here: the plot must come into view by itself.
+      await expect.poll(async () => page.evaluate(() => {
+        const box = document.querySelector('.deck-plot')!.getBoundingClientRect()
+        return (Math.min(box.bottom, window.innerHeight) - Math.max(box.top, 0)) / box.height
+      }), { timeout: 3000 }).toBeGreaterThanOrEqual(0.6)
+      const pause = await page.getByRole('button', { name: 'Pause' }).boundingBox()
+      expect(pause && pause.y >= 0 && pause.y + pause.height <= phone.viewport.height, 'playback control in view').toBe(true)
+      // The status strip (shields and hull) is watched alongside the plot.
+      await expect(page.locator('.deck-hud')).toBeInViewport({ ratio: 1 })
+      await expect(page.locator('canvas')).toHaveCount(1)
+      await page.screenshot({ path: testInfo.outputPath(`phone-commit-scrolled-${phone.viewport.width}x${phone.viewport.height}.png`) })
+      expect(errors).toEqual([])
+    })
+  })
+}
+
 test.describe('touch-only mission', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 })
 

@@ -9,14 +9,21 @@ import { createRoot } from 'react-dom/client'
 import type { GameController, GameView, PlaybackCommand, TurnOrders } from '../../../src/contracts'
 import { rendererDiagnostics } from '../../../src/rendering/BattlefieldRenderer'
 import { GameConsole } from '../../../src/ui/game/GameConsole'
-import { CROWDED_AIM, CROWDED_DESTINATION, CROWDED_FRAME, CROWDED_OWN, OWN_POSITION, PLANNING_FRAME, TURN_END, TURN_FRAMES, TURN_START, cellCentreOf, rules } from './fixtures'
+import {
+  CROWDED_AIM, CROWDED_DESTINATION, CROWDED_FRAME, CROWDED_OWN, HITS_END, HITS_FRAMES, OWN_POSITION, PLANNING_FRAME, TURN_END as AUTHORED_END,
+  TURN_FRAMES as AUTHORED_FRAMES, TURN_START, cellCentreOf, rules,
+} from './fixtures'
 import '../../../src/styles.css'
 
 type Speed = 0.5 | 1 | 2 | 4
 const initialDraft: TurnOrders = { turnIndex: 0, movement: { kind: 'hold' }, sensor: 'passive', cloak: false, weapon: { kind: 'hold' } }
 
-// ?scene=crowded plans on the crowded label-placement frame instead of the authored turn.
-const crowded = new URLSearchParams(window.location.search).get('scene') === 'crowded'
+// ?scene=crowded plans on the crowded label-placement frame; ?scene=hits plays two close
+// incoming hits instead of the authored turn.
+const scene = new URLSearchParams(window.location.search).get('scene')
+const crowded = scene === 'crowded'
+const TURN_FRAMES = scene === 'hits' ? HITS_FRAMES : AUTHORED_FRAMES
+const TURN_END = scene === 'hits' ? HITS_END : AUTHORED_END
 
 function createFixtureController() {
   const listeners = new Set<() => void>()

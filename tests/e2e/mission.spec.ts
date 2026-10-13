@@ -227,14 +227,15 @@ test('the full mission against the patrol AI: orders, combat, losing and regaini
   expect(errors).toEqual([])
 })
 
-test('on a plain-http origin the fallback copy keeps focus on the button and copies the exact link', async ({ page, context }) => {
-  // A genuine insecure origin: requests to it are served by the dev server, but the page is not
-  // a secure context, so the async clipboard API is unavailable and the fallback copy runs.
-  const origin = 'http://tsb-copy.invalid:4272'
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://127.0.0.1:4272' })
+test('on a plain-http origin the fallback copy keeps focus on the button and copies the exact link', async ({ page, context, baseURL }) => {
+  // A genuine insecure origin on the configured port: its requests are served by this run's own
+  // dev server (baseURL), but the page is not a secure context, so the fallback copy runs.
+  const local = new URL(baseURL!)
+  const origin = `http://tsb-copy.invalid:${local.port}`
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: local.origin })
   await page.route(`${origin}/**`, async (route) => {
     const url = new URL(route.request().url())
-    await route.fulfill({ response: await context.request.get(`http://127.0.0.1:4272${url.pathname}${url.search}`) })
+    await route.fulfill({ response: await context.request.get(`${local.origin}${url.pathname}${url.search}`) })
   })
   await page.goto(`${origin}/?seed=${MISSION_SEED}`)
   expect(await page.evaluate(() => window.isSecureContext)).toBe(false)
@@ -255,7 +256,7 @@ test('on a plain-http origin the fallback copy keeps focus on the button and cop
 
   // Read the system clipboard back from a secure page in the same browser.
   const reader = await context.newPage()
-  await reader.goto('http://127.0.0.1:4272/tests/fixtures/battlefield/index.html')
+  await reader.goto(`${local.origin}/tests/fixtures/battlefield/index.html`)
   expect(await reader.evaluate(() => navigator.clipboard.readText())).toBe(`${origin}/?seed=${MISSION_SEED}`)
   await reader.close()
 })
