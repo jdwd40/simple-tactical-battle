@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { DrawSummary, RendererDiagnostics } from '../../src/rendering/BattlefieldRenderer'
 import { HIDE_AND_SEEK, MISSION_SEED } from '../scenes/mission'
+import { expectReadableLabels } from './support/labels'
 
 // TSB-41: the MAIN game (App) with the real engine and the accepted patrol AI (TSB-40), from
 // the briefing to a real outcome. No scripted opponent or fixture is involved here.
@@ -108,6 +109,10 @@ test('the seed is plain reproduction data with a link that reopens the same enco
 test('the full mission against the patrol AI: orders, combat, losing and regaining contact, a real outcome, replay and restart', async ({ page }, testInfo) => {
   test.setTimeout(120_000)
   const errors = trackErrors(page)
+  // Count document loads: a dev-server reload (for example a tracked file edited in its root
+  // during the run) must be reported as such, never mistaken for restart reopening the briefing.
+  let loads = 0
+  page.on('load', () => { loads += 1 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto(`/?seed=${MISSION_SEED}`)
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()
@@ -133,7 +138,10 @@ test('the full mission against the patrol AI: orders, combat, losing and regaini
       await page.getByRole('button', { name: 'Hold position', exact: true }).click()
     }
     await radio(page, 'Weapon', turn.laser ? 'Laser' : 'Hold fire').check()
-    if (number === 1) await page.screenshot({ path: testInfo.outputPath('mission-planning-turn1-1366x768.png') })
+    if (number === 1) {
+      await expectReadableLabels(page, 'turn 1 planning')
+      await page.screenshot({ path: testInfo.outputPath('mission-planning-turn1-1366x768.png') })
+    }
     await page.getByRole('button', { name: `Commit turn ${number}` }).focus()
     await page.keyboard.press('Enter')
     await expect(phase(page)).toHaveText('Execution')
@@ -147,10 +155,12 @@ test('the full mission against the patrol AI: orders, combat, losing and regaini
     if (number === 2) {
       await expect(assessment(page)).toContainText('Laser fired at 0.1 s.')
       await expect(page.getByText('Hit: 35 shields and 0 hull lost.')).toBeVisible()
+      await expectReadableLabels(page, 'turn 2 current contact')
       await page.screenshot({ path: testInfo.outputPath('mission-exchange-turn2-1366x768.png') })
     }
     if (number === 3) {
       await expect(assessment(page)).toContainText('contact-1 lost at 4.6 s; now a last-known position.')
+      await expectReadableLabels(page, 'turn 3 last-known contact')
       await page.screenshot({ path: testInfo.outputPath('mission-withdrawn-cloaked-turn3-1366x768.png') })
     }
     if (number === 4) await expect(assessment(page)).toContainText('contact-1 detected at 6.2 s.')
@@ -170,6 +180,7 @@ test('the full mission against the patrol AI: orders, combat, losing and regaini
   await expect(page.getByTestId('outcome')).toHaveText('Defeat')
   await expect(page.getByTestId('outcome')).toBeInViewport()
   await expect(page.locator('[aria-live="polite"]')).toHaveText('Encounter over: Defeat')
+  await expectReadableLabels(page, 'defeat')
   await page.screenshot({ path: testInfo.outputPath('mission-defeat-1366x768.png') })
 
   await page.getByRole('button', { name: 'Replay final turn' }).click()
@@ -177,16 +188,54 @@ test('the full mission against the patrol AI: orders, combat, losing and regaini
   await seek(page, 820)
   await expect(ending(page)).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Replaying the final turn' })).toBeVisible()
+  await expectReadableLabels(page, 'final-turn replay')
   await page.screenshot({ path: testInfo.outputPath('mission-replay-final-turn-1366x768.png') })
   await page.getByRole('button', { name: 'Back to result' }).click()
   await expect(page.getByTestId('outcome')).toHaveText('Defeat')
 
+  expect(loads, 'the page reloaded during the mission (dev-server file change?), so its state is not from this run').toBe(1)
   await page.getByRole('button', { name: 'Restart encounter' }).click()
   await expect(phase(page)).toHaveText('Planning')
   await expect(page.getByTestId('turn-number')).toHaveText('1')
   await expect(page.getByTestId('seed')).toHaveText(String(MISSION_SEED))
+  // Restart is in-page: no navigation, and so no opening briefing.
+  await page.waitForTimeout(500)
+  expect(loads, 'restart must not reload the page').toBe(1)
   await expect(page.locator('#plot-readout')).toContainText('No contacts.')
   await expect(page.locator('canvas')).toHaveCount(1)
   await expect(briefing(page)).toBeHidden()
   expect(errors).toEqual([])
+})
+
+test('on a plain-http origin the fallback copy keeps focus on the button and copies the exact link', async ({ page, context }) => {
+  // A genuine insecure origin: requests to it are served by the dev server, but the page is not
+  // a secure context, so the async clipboard API is unavailable and the fallback copy runs.
+  const origin = 'http://tsb-copy.invalid:4272'
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://127.0.0.1:4272' })
+  await page.route(`${origin}/**`, async (route) => {
+    const url = new URL(route.request().url())
+    await route.fulfill({ response: await context.request.get(`http://127.0.0.1:4272${url.pathname}${url.search}`) })
+  })
+  await page.goto(`${origin}/?seed=${MISSION_SEED}`)
+  expect(await page.evaluate(() => window.isSecureContext)).toBe(false)
+  await page.getByRole('button', { name: 'Begin mission' }).click()
+  await page.getByLabel('Column', { exact: true }).fill('9')
+  await page.getByLabel('Row', { exact: true }).fill('12')
+  await page.getByLabel('Row', { exact: true }).press('Enter')
+
+  const copy = page.getByRole('button', { name: 'Copy seed link' })
+  await copy.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('status').filter({ hasText: 'Seed link copied.' })).toBeAttached()
+  await expect(copy).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Briefing' })).toBeFocused()
+  await expect(page.getByTestId('movement-order')).toHaveText('Column 9, row 12')
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('')
+
+  // Read the system clipboard back from a secure page in the same browser.
+  const reader = await context.newPage()
+  await reader.goto('http://127.0.0.1:4272/tests/fixtures/battlefield/index.html')
+  expect(await reader.evaluate(() => navigator.clipboard.readText())).toBe(`${origin}/?seed=${MISSION_SEED}`)
+  await reader.close()
 })

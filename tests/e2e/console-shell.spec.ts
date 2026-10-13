@@ -134,6 +134,13 @@ for (const viewport of [{ width: 1024, height: 700 }, { width: 390, height: 844 
     const commit = page.getByRole('button', { name: 'Commit turn 1' })
     await commit.scrollIntoViewIfNeeded()
     await expect(commit).toBeInViewport()
+    // Header controls wrap rather than clip: each is wholly inside the page width.
+    for (const name of ['Copy seed link', 'Briefing', 'Abandon', 'Restart']) {
+      const control = await page.getByRole('button', { name, exact: true }).boundingBox()
+      expect(control, name).not.toBeNull()
+      expect(control!.x, name).toBeGreaterThanOrEqual(0)
+      expect(control!.x + control!.width, name).toBeLessThanOrEqual(viewport.width)
+    }
 
     await page.screenshot({ path: testInfo.outputPath(`console-${viewport.width}x${viewport.height}.png`), fullPage: true })
   })

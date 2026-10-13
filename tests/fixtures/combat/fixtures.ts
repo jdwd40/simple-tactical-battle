@@ -12,7 +12,7 @@
  */
 import {
   DUEL_RULES, SAMPLE_PLAYER_OBSERVATION, cellCentre,
-  type ContactMemory, type HostileOrdnanceMemory, type OwnMissileTelemetry, type Position, type PublicReplayFrame, type VisibleEvent,
+  type ContactMemory, type HostileOrdnanceMemory, type OwnMissileTelemetry, type Position, type PublicReplayFrame, type SideObservation, type VisibleEvent,
 } from '../../../src/contracts'
 
 export const rules = DUEL_RULES
@@ -101,3 +101,29 @@ function frameAt(tick: number, turnIndex: number, withEvents = true): PublicRepl
 export const TURN_FRAMES: readonly PublicReplayFrame[] = Array.from({ length: TURN_END + 1 }, (_, tick) => frameAt(tick, 0))
 /** Planning frame before that turn: a current contact five cells east, weapons ready. */
 export const PLANNING_FRAME: PublicReplayFrame = frameAt(0, 0, false)
+
+/**
+ * Crowded planning frame for label-placement checks (TSB-50): the own ship one cell from the
+ * right edge with markers on every side, a stale contact with a map-sized uncertainty area,
+ * and own and hostile ordnance near each other. Hand-written public data, no simulation.
+ */
+export const CROWDED_OWN = cellCentre({ column: 18, row: 10 }, rules)
+export const CROWDED_DESTINATION = { column: 19, row: 10 } as const
+export const CROWDED_AIM = { column: 17, row: 9 } as const
+export const CROWDED_FRAME: PublicReplayFrame = (() => {
+  const base = SAMPLE_PLAYER_OBSERVATION
+  const tick = 400
+  const observation = {
+    ...base, tick, turnIndex: 4, events: [],
+    ownShip: { ...base.ownShip, position: CROWDED_OWN, destination: CROWDED_DESTINATION },
+    contacts: [
+      { alias: 'contact-1', kind: 'current', measurement: { position: cellCentre({ column: 19, row: 9 }, rules), tick }, ageTicks: 0, uncertaintyRadiusUnits: 0 },
+      { alias: 'contact-2', kind: 'stale', measurement: { position: cellCentre({ column: 17, row: 11 }, rules), tick: tick - 300 }, ageTicks: 300, uncertaintyRadiusUnits: 300 * rules.maxShipSpeedUnitsPerTick },
+      { alias: 'contact-3', kind: 'stale', measurement: { position: cellCentre({ column: 18, row: 12 }, rules), tick: tick - 15 }, ageTicks: 15, uncertaintyRadiusUnits: 15 * rules.maxShipSpeedUnitsPerTick },
+    ],
+    ownMissiles: [{ id: 'own-missile-2', position: cellCentre({ column: 18, row: 9 }, rules), aim: { column: 15, row: 9 }, launchTick: 392, updatedTick: tick, status: 'flying' }],
+    hostileMissiles: [{ alias: 'missile-1', kind: 'current', measurement: { position: cellCentre({ column: 19, row: 11 }, rules), tick }, ageTicks: 0, uncertaintyRadiusUnits: 0 }],
+  } satisfies SideObservation
+  return { tick, observation, events: [] }
+})()
+export const cellCentreOf = (cell: { readonly column: number; readonly row: number }) => cellCentre(cell, rules)

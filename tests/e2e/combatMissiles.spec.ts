@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { DrawSummary, RendererDiagnostics } from '../../src/rendering/BattlefieldRenderer'
 import { DEAD_LAUNCHER, EVASION, type MissileTurn } from '../harness/duel/sequence'
+import { expectReadableLabels } from './support/labels'
 
 // TSB-31 missiles and automatic aftermath on the REAL engine (TSB-30B), seed 17, on the
 // test-only duel page (tests/harness/duel) with labelled scripted opponents. Every tick and
@@ -97,12 +98,14 @@ test('a missile aimed on the plot flies straight and stops on an asteroid face, 
   expect((await drawn(page)).ownMissiles.map((missile) => missile.id)).toHaveLength(1)
   await expect(readout(page)).toContainText('Own missile at')
   await expect(page.getByTestId('own-launcher')).toHaveText(/^Cooling, /)
+  await expectReadableLabels(page, 'own missile in flight')
   await page.screenshot({ path: testInfo.outputPath('missile-in-flight-1366x768.png') })
   await seek(page, 222)
   expect((await drawn(page)).effects).toEqual([])
   await seek(page, 223)
   expect(await drawn(page)).toMatchObject({ ownMissiles: [], effects: ['impact-missile'] })
   await expect(page.getByText('Missile impact observed at column 7, row 6.')).toBeVisible()
+  await expectReadableLabels(page, 'asteroid impact')
   await page.screenshot({ path: testInfo.outputPath('missile-asteroid-impact-1366x768.png') })
   await page.getByRole('button', { name: 'Skip to end' }).click()
   await expect(assessment(page)).toContainText('Missile fired at 0.1 s.')
@@ -148,6 +151,7 @@ test('a hostile missile is tracked without aim and evaded by moving; a lost trac
   expect(track.map(({ alias, kind }) => ({ alias, kind }))).toEqual([{ alias: 'missile-2', kind: 'stale' }])
   expect(track[0].radiusPx).toBeGreaterThan(0)
   await expect(readout(page)).toContainText('Its aim is unknown.')
+  await expectReadableLabels(page, 'hostile last sighting')
   await page.screenshot({ path: testInfo.outputPath('missile-hostile-last-sighting-planning-1366x768.png') })
   expect(errors).toEqual([])
 })

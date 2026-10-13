@@ -11,10 +11,17 @@ async function copyText(text: string): Promise<boolean> {
   } catch {
     // Fall through to the selection-based copy.
   }
+  // The selection-based copy has to focus a temporary field; give focus back to whatever had it
+  // (the copy button), so keyboard order continues exactly as after a secure-origin copy.
+  const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
   const area = document.createElement('textarea')
   area.value = text
   area.setAttribute('readonly', '')
+  area.setAttribute('aria-hidden', 'true')
+  area.tabIndex = -1
   area.style.position = 'fixed'
+  area.style.top = '0'
+  area.style.left = '0'
   area.style.opacity = '0'
   document.body.appendChild(area)
   area.select()
@@ -25,6 +32,8 @@ async function copyText(text: string): Promise<boolean> {
     copied = false
   }
   area.remove()
+  window.getSelection()?.removeAllRanges()
+  previous?.focus({ preventScroll: true })
   return copied
 }
 

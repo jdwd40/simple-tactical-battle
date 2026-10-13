@@ -9,17 +9,22 @@ import { createRoot } from 'react-dom/client'
 import type { GameController, GameView, PlaybackCommand, TurnOrders } from '../../../src/contracts'
 import { rendererDiagnostics } from '../../../src/rendering/BattlefieldRenderer'
 import { GameConsole } from '../../../src/ui/game/GameConsole'
-import { OWN_POSITION, PLANNING_FRAME, TURN_END, TURN_FRAMES, TURN_START, rules } from './fixtures'
+import { CROWDED_AIM, CROWDED_DESTINATION, CROWDED_FRAME, CROWDED_OWN, OWN_POSITION, PLANNING_FRAME, TURN_END, TURN_FRAMES, TURN_START, cellCentreOf, rules } from './fixtures'
 import '../../../src/styles.css'
 
 type Speed = 0.5 | 1 | 2 | 4
 const initialDraft: TurnOrders = { turnIndex: 0, movement: { kind: 'hold' }, sensor: 'passive', cloak: false, weapon: { kind: 'hold' } }
 
+// ?scene=crowded plans on the crowded label-placement frame instead of the authored turn.
+const crowded = new URLSearchParams(window.location.search).get('scene') === 'crowded'
+
 function createFixtureController() {
   const listeners = new Set<() => void>()
   const commands: string[] = []
   let phase: 'planning' | 'execution' = 'planning'
-  let draft = initialDraft
+  let draft: TurnOrders = crowded
+    ? { turnIndex: 4, movement: { kind: 'destination', cell: CROWDED_DESTINATION }, sensor: 'passive', cloak: true, weapon: { kind: 'missile', aim: CROWDED_AIM } }
+    : initialDraft
   let cursor = TURN_START
   let playing = false
   let speed: Speed = 1
@@ -30,6 +35,13 @@ function createFixtureController() {
   const build = (): GameView => {
     const base = { encounterId: `fixture-${encounter}`, revision, rules }
     if (phase === 'planning') {
+      if (crowded) {
+        const target = cellCentreOf(CROWDED_DESTINATION)
+        return {
+          ...base, phase, frame: CROWDED_FRAME, draft, validation: { structurallyValid: true, issues: [] }, replay: null,
+          routePreview: { kind: 'destination', destination: CROWDED_DESTINATION, waypoints: [CROWDED_OWN, target], nominalReachablePoint: target, predicted: true, conditionalOnPropulsionFunding: true },
+        }
+      }
       return { ...base, phase, frame: PLANNING_FRAME, draft, validation: { structurallyValid: true, issues: [] }, routePreview: { kind: 'hold', position: OWN_POSITION }, replay: null }
     }
     const frames = TURN_FRAMES.slice(0, cursor + 1)
