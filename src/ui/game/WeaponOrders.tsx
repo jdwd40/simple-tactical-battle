@@ -78,6 +78,8 @@ export function WeaponOrders({
     } else {
       setPendingMissile(true)
       onAimingChange(true)
+      // Until a cell is chosen the intent is hold fire, never a leftover laser.
+      if (weapon.kind !== 'missile') onWeapon({ kind: 'hold' })
     }
   }
   const submitAim = (event: FormEvent) => {
