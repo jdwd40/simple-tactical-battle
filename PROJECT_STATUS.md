@@ -19,8 +19,8 @@ Herdr shut down at22:58:38 UTC on2026-10-12 (server log; cause not established).
 | Role | Pane / tab | Current state |
 | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | Exact original active thread/frontend recovered; orchestration checkpoint |
-| General | w7:p3 / opusx builder | Original Claude session restored; trust prompt pending;10 delivered |
-| UI | w7:p5 / opus UI | Original session restored; trust prompt pending;11B uncommitted work preserved |
+| General | w7:p3 / opusx builder | Original session recovered, trust approved/cleared;10 accepted; no active implementation assignment |
+| UI | w7:p5 / opus UI | Original session recovered, trust approved/cleared;11B /1 resumed in preserved worktree |
 | Assistant | w7:p6 / codex Jnr | Original session recovered; TSB-12A /1 accepted/integrated; no active assignment |
 | Reviewer | w7:p7 / sol6.1h Review | Original session recovered; REVIEW-TSB-12A /1/round0 PASS; no pending review |
 
@@ -60,9 +60,9 @@ Approved baseline unchanged; numerical values are tuning hypotheses. Accepted re
 
 Initial concrete schema typing transferred to Assistant after General02 stalled without edits; General retains engine/combat/AI. General10 resumed concrete implementation after same-task checkpoint steering; type/lint checks clean, tests underway, configuration unchanged. UI11B is checking actual Pixi rendering in Chromium and building focused tests.
 
-BLOCKER: Both restored Claude sessions are at the /home/jd folder-trust dialog. Pending user question asks permission to confirm those two prompts or leave them for the user. Bundled herdr --skill (snapshot /tmp/tsb-herdr-SKILL.md:133) explicitly says "Inspect the blocked UI and ask the user before answering it." No answer assumed. All independent ready work has been accepted; no review currently pending. Full implementation remains authorised and incomplete.
+2026-10-13 user answered "yes resume", authorising the two existing /home/jd folder-trust confirmations. Both observed prompts confirmed; restored Claude readiness/identity being checked. Full implementation remains authorised. Do not ask again for the same startup confirmations.
 
-Exact next action after confirmation: re-read p3/p5 dialogs, confirm only the authorised existing-folder prompts, revalidate original UUIDs/readiness and inspect actual modes without changing configuration. Resume UI TSB-11B / attempt1, same worktree/branch/base cf58c7d; preserve its uncommitted src/rendering,src/ui/gameplay,tests/e2e/battlefield.spec.ts,tests/fixtures. Task server4272 is stopped. Collect committed delivery and review it; then UI11C real engine/controller binding at an accepted integration base. General10 already accepted, no further active General assignment until M1's dependency gate. Assistant12B follows controller; no fake M1/demo claim.
+Recovery complete2026-10-13: observed/confirmed the authorised dialogs, revalidated original p3/p5 UUIDs. General RECOVERY-G01/1 confirms role and clean accepted10 checkout, no active assignment. UI11B/1 resumed in same worktree/branch/base cf58c7d with its source preserved;14browser checks pass, screenshot overlap being fixed before committed delivery. No session configuration changes. Next: collect11B exact delivery, review/integrate, then UI11C real engine/controller binding at accepted integration base. General20 waits for M1 acceptance; Assistant12B follows controller. No M1/demo claim yet.
 
 Continue20/21/22,30/31/32,40/41/42,50/51/52 through the scoped release candidate. Sole acceptance/dependencies remain DEVELOPMENT_PLAN.md. Herdr server started during recovery is left running; no server stop/update, public deployment or unrelated process changes.
 
