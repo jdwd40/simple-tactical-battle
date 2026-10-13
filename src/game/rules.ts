@@ -50,12 +50,21 @@ export const ENEMIES: Record<EnemyKind, EnemySpec> = {
   warlord: { name: 'Warlord', size: 0.5, hull: 200, shield: 80, move: 1, laserRange: 5, laserDamage: 22, missileRange: 7, missileDamage: 30, missileSplash: 15, missileCooldown: 2, points: 1200, standoff: 4 },
 };
 
-export const PICKUPS: Record<PickupKind, { name: string; amount: number }> = {
-  energy: { name: 'Energy cell', amount: 30 },
-  shield: { name: 'Shield charge', amount: 30 },
-  missile: { name: 'Missile crate', amount: 2 },
-  repair: { name: 'Repair kit', amount: 25 },
+export const PICKUPS: Record<PickupKind, { name: string; amount: number; weight: number }> = {
+  energy: { name: 'Energy cell', amount: 30, weight: 4 },
+  shield: { name: 'Shield charge', amount: 30, weight: 4 },
+  missile: { name: 'Missile crate', amount: 2, weight: 3 },
+  repair: { name: 'Repair kit', amount: 25, weight: 3 },
+  rail: { name: 'Rail capacitor', amount: 1, weight: 2 },
+  overdrive: { name: 'Overdrive', amount: 1, weight: 2 },
+  salvage: { name: 'Salvage', amount: 200, weight: 3 },
 };
+
+/** Chance a destroyed enemy leaves a pickup behind. */
+export const DROP_CHANCE = 0.35;
+
+/** Enemies below this hull fraction look for a nebula to hide in. */
+export const RETREAT_HULL = 0.4;
 
 /** Which enemies show up on a given wave. */
 export function waveRoster(wave: number): EnemyKind[] {

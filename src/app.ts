@@ -2,11 +2,12 @@ import { Hud } from './ui/hud';
 import { Renderer } from './render/renderer';
 import { Sfx } from './audio/sfx';
 import { shipColor } from './render/ships';
+import { PICKUP_COLORS, PICKUP_LABELS } from './render/pickups';
 import {
   canBoost, canFlak, canRail, createGame, endPlayerTurn, flakTargets, laserTargets, missileTargets, moveTargets, playerBoost,
-  playerFlak, playerLaser, playerMissile, playerMove, playerRail, railDirectionFor, railLine, railTargets, runEnemyTurn, startWave, threatCells,
+  inNebula, playerFlak, playerLaser, playerMissile, playerMove, playerRail, railDirectionFor, railLine, railTargets, runEnemyTurn, startWave, threatCells,
 } from './game/state';
-import { ENEMIES, PICKUPS, PLAYER } from './game/rules';
+import { ENEMIES, PLAYER } from './game/rules';
 import { key, same } from './game/grid';
 import type { ActionMode, DamageResult, EnemyKind, GameEvent, GameState, Vec } from './game/types';
 
@@ -77,7 +78,8 @@ export class App {
         <li><span class="dot" style="color:#40e0ff"></span><span>Your battlecruiser gets <b>3 actions</b> per turn. Tap a glowing cell to move.</span></li>
         <li><span class="dot" style="color:#ff4fa3"></span><span><b>Laser</b> needs line of sight. <b>Railgun</b> pierces a whole line, then cools down.</span></li>
         <li><span class="dot" style="color:#ffc64a"></span><span><b>Flak</b> shreds every fighter nearby. <b>Missiles</b> arc over rocks and splash 3×3.</span></li>
-        <li><span class="dot" style="color:#5cf29a"></span><span>Grab pickups, chain kills for combos, survive the Warlord every 5th wave.</span></li>
+        <li><span class="dot" style="color:#c77dff"></span><span>Hide in <b>nebula</b> clouds: only adjacent ships can laser you. Enemies hide too.</span></li>
+        <li><span class="dot" style="color:#5cf29a"></span><span>Grab loot, chain kills for combos, survive the Warlord every 5th wave.</span></li>
       </ul>
       ${this.best ? `<p class="best">Best score ${this.best.toLocaleString()}</p>` : ''}
       <button class="btn">Launch</button>
@@ -184,7 +186,8 @@ export class App {
     if (enemy) {
       const spec = ENEMIES[enemy.kind as EnemyKind];
       const wpn = spec.missileRange ? `laser ${spec.laserRange} · missile ${spec.missileRange}` : `laser range ${spec.laserRange}`;
-      this.hud.hint(`${spec.name}: hull ${enemy.hull}${enemy.maxShield ? ` · shield ${enemy.shield}` : ''} · ${wpn} · moves ${spec.move}`, 'enemy');
+      const hidden = inNebula(s, enemy.pos) ? ' · hiding in nebula' : '';
+      this.hud.hint(`${spec.name}: hull ${enemy.hull}${enemy.maxShield ? ` · shield ${enemy.shield}` : ''} · ${wpn} · moves ${spec.move}${hidden}`, 'enemy');
       this.sfx.play('click');
       return;
     }
@@ -274,6 +277,7 @@ export class App {
         for (const p of moveTargets(s)) r.highlights.set(key(p), 'move');
         for (const e of laserTargets(s)) r.highlights.set(key(e.pos), 'laser');
         hint = s.ap > 0 ? `${s.ap} action${s.ap === 1 ? '' : 's'} left. Tap a cell to move or an enemy to fire.` : 'No actions left. End your turn.';
+        if (inNebula(s, s.player.pos)) hint = 'Hidden in the nebula: only adjacent ships can laser you. Missiles still land.';
         if (s.ap > 0 && flakTargets(s).length >= 2 && canFlak(s)) hint = `${flakTargets(s).length} ships in flak range!`;
         if (s.ap > 0 && s.energy < PLAYER.flak.cost) hint = 'Low energy! End the turn to recharge or grab a cell.';
       }
@@ -294,20 +298,31 @@ export class App {
         }
         case 'move': {
           this.sfx.play('move');
-          await r.animateMove(ev.id, ev.path, ev.id === s.player.id ? 150 : 120);
-          await sleep(60);
+          const isFighter = r.ships.get(ev.id)?.kind === 'fighter' || r.ships.get(ev.id)?.kind === 'corvette';
+          await r.animateMove(ev.id, ev.path, ev.id === s.player.id ? 150 : isFighter ? 80 : 120);
+          await sleep(ev.retreat ? 40 : 60);
           break;
         }
         case 'pickup': {
           const c = r.centre(ev.pos);
           r.pickups = r.pickups.filter((p) => p.id !== ev.id);
           this.sfx.play('pickup');
-          const colors = { energy: '#ffc64a', shield: '#40e0ff', missile: '#ff4fa3', repair: '#5cf29a' };
-          r.fx.burst(c.x, c.y, 24, colors[ev.kind], 140, 3, 0.7);
-          r.fx.ring(c.x, c.y, r.cell * 1.2, colors[ev.kind]);
-          r.fx.text(c.x, c.y - r.cell * 0.3, `+${ev.amount} ${PICKUPS[ev.kind].name.split(' ')[0].toUpperCase()}`, colors[ev.kind], Math.max(12, r.cell * 0.32));
+          const col = PICKUP_COLORS[ev.kind];
+          r.fx.burst(c.x, c.y, 24, col, 140, 3, 0.7);
+          r.fx.ring(c.x, c.y, r.cell * 1.2, col);
+          r.fx.text(c.x, c.y - r.cell * 0.3, PICKUP_LABELS[ev.kind](ev.amount), col, Math.max(12, r.cell * 0.32));
+          if (ev.kind === 'overdrive') { this.hud.banner('Overdrive', 'extra action', 'gold'); this.sfx.play('crit'); }
           this.hud.update(s, this.best, this.mode, NONE);
           await sleep(300);
+          break;
+        }
+        case 'drop': {
+          const c = r.centre(ev.pickup.pos);
+          r.pickups.push({ id: ev.pickup.id, kind: ev.pickup.kind, x: ev.pickup.pos.x, y: ev.pickup.pos.y });
+          r.fx.ring(c.x, c.y, r.cell * 0.8, PICKUP_COLORS[ev.pickup.kind], 0.5, 2);
+          r.fx.text(c.x, c.y + r.cell * 0.35, 'LOOT', PICKUP_COLORS[ev.pickup.kind], Math.max(11, r.cell * 0.26));
+          this.sfx.play('select');
+          await sleep(200);
           break;
         }
         case 'laser': {

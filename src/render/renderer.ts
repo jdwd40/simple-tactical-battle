@@ -2,6 +2,7 @@ import type { GameState, PickupKind, Ship, Vec } from '../game/types';
 import { key } from '../game/grid';
 import { drawShip, shipColor, shipSize } from './ships';
 import { Effects } from './effects';
+import { PICKUP_COLORS, PICKUP_GLYPHS } from './pickups';
 
 export type HighlightKind = 'move' | 'laser' | 'missile' | 'rail' | 'threat' | 'selected' | 'path';
 
@@ -40,6 +41,8 @@ export class Renderer {
   private dpr = 1;
   private stars: Star[] = [];
   private asteroids: Vec[] = [];
+  private nebula: Vec[] = [];
+  private nebulaSet = new Set<string>();
   private asteroidSeeds = new Map<string, number>();
   ships = new Map<number, VShip>();
   pickups: VPickup[] = [];
@@ -93,6 +96,10 @@ export class Renderer {
       this.asteroidSeeds.clear();
       for (const a of s.asteroids) this.asteroidSeeds.set(key(a), Math.random());
       this.resize();
+    }
+    if (this.nebula !== s.nebula) {
+      this.nebula = s.nebula;
+      this.nebulaSet = new Set(s.nebula.map(key));
     }
     const seen = new Set<number>();
     for (const ship of [s.player, ...s.enemies]) {
@@ -205,6 +212,7 @@ export class Renderer {
     for (let y = 0; y <= this.rows; y++) { ctx.moveTo(0, y * cell + 0.5); ctx.lineTo(W, y * cell + 0.5); }
     ctx.stroke();
 
+    this.drawNebula(W, H);
     // Threat overlay
     for (const k of this.threats) {
       const [x, y] = k.split(',').map(Number);
@@ -231,6 +239,47 @@ export class Renderer {
     vg.addColorStop(1, 'rgba(0,0,0,0.55)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, W, H);
+  }
+
+  private drawNebula(W: number, H: number): void {
+    if (!this.nebula.length) return;
+    const { ctx, cell } = this;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.clip();
+    // Soft base tint so the covered cells read clearly, even on small screens.
+    ctx.fillStyle = 'rgba(150, 90, 255, 0.16)';
+    for (const n of this.nebula) ctx.fillRect(n.x * cell, n.y * cell, cell, cell);
+    // Billowing cloud blobs, drifting slowly.
+    for (const n of this.nebula) {
+      const c = this.centre(n);
+      for (let i = 0; i < 4; i++) {
+        const ph = this.time * 0.35 + n.x * 1.7 + n.y * 2.3 + i * 1.6;
+        const ox = Math.cos(ph) * cell * 0.3, oy = Math.sin(ph * 0.8) * cell * 0.3;
+        const rad = cell * (0.75 + 0.15 * Math.sin(ph * 1.3 + i));
+        const g = ctx.createRadialGradient(c.x + ox, c.y + oy, 0, c.x + ox, c.y + oy, rad);
+        g.addColorStop(0, i % 2 === 0 ? 'rgba(210, 150, 255, 0.34)' : 'rgba(140, 80, 240, 0.30)');
+        g.addColorStop(0.6, 'rgba(140, 80, 240, 0.14)');
+        g.addColorStop(1, 'rgba(140, 80, 240, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(c.x + ox, c.y + oy, rad, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Twinkling dust motes.
+    for (const n of this.nebula) {
+      const c = this.centre(n);
+      for (let i = 0; i < 4; i++) {
+        const tw = 0.3 + 0.7 * Math.abs(Math.sin(this.time * 2.2 + n.x * 5 + n.y * 3 + i * 1.9));
+        ctx.fillStyle = `rgba(240, 215, 255, ${tw.toFixed(2)})`;
+        const px = c.x + Math.sin(n.x * 9 + i * 2.7) * cell * 0.38;
+        const py = c.y + Math.cos(n.y * 7 + i * 1.3 + this.time * 0.4) * cell * 0.38;
+        ctx.fillRect(px, py, 2, 2);
+      }
+    }
+    ctx.restore();
   }
 
   private drawHighlight(x: number, y: number, kind: HighlightKind, pulse: number): void {
@@ -314,8 +363,7 @@ export class Renderer {
     const { ctx, cell } = this;
     const c = this.centre({ x: p.x, y: p.y });
     const bob = Math.sin(this.time * 3 + p.id) * cell * 0.04;
-    const colors: Record<PickupKind, string> = { energy: '#ffc64a', shield: '#40e0ff', missile: '#ff4fa3', repair: '#5cf29a' };
-    const col = colors[p.kind];
+    const col = PICKUP_COLORS[p.kind];
     ctx.save();
     ctx.translate(c.x, c.y + bob);
     // glow ring
@@ -346,8 +394,7 @@ export class Renderer {
     ctx.font = `bold ${Math.round(cell * 0.3)}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const glyph: Record<PickupKind, string> = { energy: '⚡', shield: '◈', missile: '▲', repair: '+' };
-    ctx.fillText(glyph[p.kind], 0, 1);
+    ctx.fillText(PICKUP_GLYPHS[p.kind], 0, 1);
     ctx.restore();
   }
 
@@ -357,6 +404,7 @@ export class Renderer {
     const bob = this.reducedMotion ? 0 : Math.sin(this.time * 2 + v.bob) * cell * 0.02;
     ctx.save();
     ctx.translate(c.x, c.y + bob);
+    if (this.nebulaSet.has(key({ x: Math.round(v.x), y: Math.round(v.y) }))) ctx.globalAlpha = 0.72;
     // shield bubble
     if (v.shield > 0 || v.shieldFlash > 0) {
       const a = 0.12 + (v.shield / Math.max(1, v.maxShield)) * 0.2 + v.shieldFlash * 0.6;

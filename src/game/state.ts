@@ -1,6 +1,6 @@
-import { createRng, pick, randInt, shuffle, type Rng } from './rng';
+import { createRng, randInt, shuffle, type Rng } from './rng';
 import { angle, cheb, dist, findPath, floodFill, hasLineOfSight, key, same, type GridInfo } from './grid';
-import { COLS, ENEMIES, PICKUPS, PLAYER, ROWS, waveRoster } from './rules';
+import { COLS, DROP_CHANCE, ENEMIES, PICKUPS, PLAYER, RETREAT_HULL, ROWS, waveRoster } from './rules';
 import type { DamageResult, EnemyKind, GameEvent, GameState, Pickup, PickupKind, Ship, Vec } from './types';
 
 /** All randomness goes through here; the seed replays a run. */
@@ -51,6 +51,7 @@ export function createGame(seed = Date.now() % 1_000_000): GameState {
     cols: COLS,
     rows: ROWS,
     asteroids: [],
+    nebula: [],
     player: {
       id: 1, kind: 'player', pos: { x: 3, y: ROWS - 2 }, hull: PLAYER.hull, maxHull: PLAYER.hull,
       shield: PLAYER.shield, maxShield: PLAYER.shield, facing: -Math.PI / 2, missileCooldown: 0,
@@ -90,6 +91,7 @@ export function startWave(s: GameState): GameEvent[] {
   const roster = waveRoster(s.wave);
   for (let attempt = 0; attempt < 50; attempt++) {
     s.asteroids = [];
+    s.nebula = [];
     s.enemies = [];
     s.pickups = [];
     const taken = new Set<string>([key(s.player.pos)]);
@@ -107,18 +109,51 @@ export function startWave(s: GameState): GameEvent[] {
       taken.add(key(p));
       s.enemies.push(makeEnemy(s, kind, p));
     }
-    const pickupCount = s.wave === 1 ? 1 : randInt(rng, 1, 2);
-    const kinds: PickupKind[] = ['energy', 'shield', 'missile', 'repair'];
+    // Nebula: two or three small clouds, never on asteroids or ships.
+    const clouds = s.wave === 1 ? 2 : randInt(rng, 2, 3);
+    for (let c = 0; c < clouds; c++) {
+      const seed = { x: randInt(rng, 0, s.cols - 1), y: randInt(rng, 2, s.rows - 3) };
+      const size = randInt(rng, 2, 4);
+      let cur = seed;
+      for (let i = 0; i < size; i++) {
+        if (!taken.has(key(cur)) && !s.nebula.some((n) => same(n, cur))) s.nebula.push(cur);
+        const next = { x: cur.x + randInt(rng, -1, 1), y: cur.y + randInt(rng, -1, 1) };
+        if (next.x >= 0 && next.y >= 1 && next.x < s.cols && next.y < s.rows - 1) cur = next;
+      }
+    }
+    const pickupCount = s.wave === 1 ? 2 : randInt(rng, 2, 3);
     for (let i = 0; i < pickupCount; i++) {
       const p = { x: randInt(rng, 0, s.cols - 1), y: randInt(rng, 3, s.rows - 3) };
       if (taken.has(key(p))) continue;
       taken.add(key(p));
-      const kind = s.player.hull < 50 && i === 0 ? 'repair' : pick(rng, kinds);
+      const kind = s.player.hull < 50 && i === 0 ? 'repair' : rollPickup(rng);
       s.pickups.push({ id: s.nextId++, kind, pos: p });
     }
     if (s.enemies.length === roster.length && layoutConnected(s)) break;
   }
   return [{ type: 'turnStart', who: 'player' }];
+}
+
+function rollPickup(rng: Rng): PickupKind {
+  const kinds = Object.keys(PICKUPS) as PickupKind[];
+  const total = kinds.reduce((n, k) => n + PICKUPS[k].weight, 0);
+  let roll = rng() * total;
+  for (const k of kinds) {
+    roll -= PICKUPS[k].weight;
+    if (roll <= 0) return k;
+  }
+  return 'energy';
+}
+
+export function inNebula(s: GameState, p: Vec): boolean {
+  return s.nebula.some((n) => same(n, p));
+}
+
+/** Direct-fire rule: a target inside a nebula can only be hit from an adjacent cell. */
+export function canDirectHit(s: GameState, from: Vec, target: Vec, range: number): boolean {
+  if (dist(from, target) > range + 0.5) return false;
+  if (inNebula(s, target) && cheb(from, target) > 1) return false;
+  return hasLineOfSight(gridInfo(s), from, target);
 }
 
 function layoutConnected(s: GameState): boolean {
@@ -152,7 +187,7 @@ export function moveTargets(s: GameState): Vec[] {
 }
 
 export function canLaser(s: GameState, target: Ship): boolean {
-  return dist(s.player.pos, target.pos) <= PLAYER.laser.range + 0.5 && hasLineOfSight(gridInfo(s), s.player.pos, target.pos);
+  return canDirectHit(s, s.player.pos, target.pos, PLAYER.laser.range);
 }
 
 export function laserTargets(s: GameState): Ship[] {
@@ -237,7 +272,7 @@ export function threatCells(s: GameState): Set<string> {
           const p = { x, y };
           const pk = key(p);
           if (out.has(pk) || g.blocked.has(pk)) continue;
-          if (dist(p, from) <= spec.laserRange + 0.5 && hasLineOfSight(g, from, p)) out.add(pk);
+          if (canDirectHit(s, from, p, spec.laserRange)) out.add(pk);
         }
       }
     }
@@ -266,6 +301,12 @@ function resolveDeaths(s: GameState, events: GameEvent[]): void {
     s.score += points;
     s.kills += 1;
     events.push({ type: 'destroyed', id: e.id, kind: e.kind, pos: e.pos, points, combo });
+    const rng = rngFor(s);
+    if (rng() < DROP_CHANCE && !pickupAt(s, e.pos) && !same(e.pos, s.player.pos)) {
+      const pickup: Pickup = { id: s.nextId++, kind: rollPickup(rng), pos: { ...e.pos } };
+      s.pickups.push(pickup);
+      events.push({ type: 'drop', pickup });
+    }
   }
   s.enemies = s.enemies.filter((e) => e.hull > 0);
   if (s.player.hull <= 0 && s.phase !== 'gameOver') {
@@ -303,6 +344,9 @@ export function playerMove(s: GameState, to: Vec): GameEvent[] {
     if (pickup.kind === 'shield') s.player.shield = Math.min(s.player.maxShield, s.player.shield + amount);
     if (pickup.kind === 'missile') s.missiles = Math.min(s.maxMissiles, s.missiles + amount);
     if (pickup.kind === 'repair') s.player.hull = Math.min(s.player.maxHull, s.player.hull + amount);
+    if (pickup.kind === 'rail') { s.railCooldown = 0; s.energy = Math.min(s.maxEnergy, s.energy + 10); }
+    if (pickup.kind === 'overdrive') s.ap += 1;
+    if (pickup.kind === 'salvage') s.score += amount;
     s.score += 50;
     events.push({ type: 'pickup', id: pickup.id, kind: pickup.kind, pos: to, amount });
   }
@@ -360,7 +404,7 @@ export function playerRail(s: GameState, cell: Vec): GameEvent[] {
   const hits: DamageResult[] = [];
   for (const p of line) {
     const target = s.enemies.find((e) => same(e.pos, p));
-    if (target) hits.push(applyDamage(target, PLAYER.rail.damage, false));
+    if (target && (!inNebula(s, p) || cheb(p, s.player.pos) <= 1)) hits.push(applyDamage(target, PLAYER.rail.damage, false));
   }
   const end = line[line.length - 1] ?? { ...s.player.pos };
   events.push({ type: 'rail', shooterId: s.player.id, from: { ...s.player.pos }, to: end, hits });
@@ -399,7 +443,7 @@ export function endPlayerTurn(s: GameState): GameEvent[] {
 
 // ---------- enemy turn ----------
 
-/** Resolve every enemy's turn. Each enemy moves, then fires once if it can. */
+/** Resolve every enemy's turn. Each enemy moves, fires once if it can, and fighters pull back out. */
 export function runEnemyTurn(s: GameState): GameEvent[] {
   const events: GameEvent[] = [];
   if (s.phase !== 'enemy') return events;
@@ -408,26 +452,30 @@ export function runEnemyTurn(s: GameState): GameEvent[] {
     if (s.player.hull <= 0) break;
     const spec = ENEMIES[e.kind as EnemyKind];
     if (e.missileCooldown > 0) e.missileCooldown -= 1;
+    const hurt = e.hull < e.maxHull * RETREAT_HULL;
+    const hitAndRun = e.kind === 'fighter' || e.kind === 'corvette';
+    const canShootFrom = (p: Vec): boolean => canDirectHit(s, p, s.player.pos, spec.laserRange);
 
-    const g = gridInfo(s);
-    const canShoot = (): boolean => dist(e.pos, s.player.pos) <= spec.laserRange + 0.5 && hasLineOfSight(g, e.pos, s.player.pos);
-
-    // Movement: approach if it cannot shoot; otherwise sidestep sometimes to feel alive.
-    if (!canShoot() || (dist(e.pos, s.player.pos) < spec.standoff - 0.5 && rng() < 0.6)) {
+    // Phase 1: reposition. Hit-and-run ships spend part of their movement now and keep the rest to escape.
+    const budget = hitAndRun ? Math.ceil(spec.move * 0.6) : spec.move;
+    let stepsUsed = 0;
+    const wantsMove = !canShootFrom(e.pos) || hurt || (dist(e.pos, s.player.pos) < spec.standoff - 0.5 && rng() < 0.6) || (hitAndRun && rng() < 0.4);
+    if (wantsMove) {
       const mg = moveGrid(s, e);
-      const fill = floodFill(mg, e.pos, spec.move);
+      const fill = floodFill(mg, e.pos, budget);
       let best: Vec | null = null;
-      let bestScore = scoreCell(s, e, e.pos);
+      let bestScore = scoreCell(s, e, e.pos, hurt);
       for (const [k] of fill) {
         const [x, y] = k.split(',').map(Number);
         const p = { x, y };
         if (same(p, e.pos)) continue;
-        const sc = scoreCell(s, e, p) + rng() * 0.3;
+        const sc = scoreCell(s, e, p, hurt) + rng() * 0.3;
         if (sc > bestScore) { bestScore = sc; best = p; }
       }
       if (best) {
-        const path = findPath(mg, e.pos, best, spec.move);
+        const path = findPath(mg, e.pos, best, budget);
         if (path) {
+          stepsUsed = path.length;
           e.facing = angle(path.length > 1 ? path[path.length - 2] : e.pos, best);
           e.pos = best;
           events.push({ type: 'move', id: e.id, path });
@@ -435,18 +483,45 @@ export function runEnemyTurn(s: GameState): GameEvent[] {
       }
     }
 
-    // Attack.
+    // Phase 2: attack.
     const d = dist(e.pos, s.player.pos);
-    if (spec.missileRange > 0 && e.missileCooldown === 0 && d <= spec.missileRange + 0.5 && d > 1.5) {
+    let fired = false;
+    if (spec.missileRange > 0 && e.missileCooldown === 0 && d <= spec.missileRange + 0.5 && d > 1.5 && !(hurt && rng() < 0.5)) {
       e.missileCooldown = spec.missileCooldown;
       e.facing = angle(e.pos, s.player.pos);
       const at = { ...s.player.pos };
       const hits = missileBlast(s, at, spec.missileDamage, spec.missileSplash);
       events.push({ type: 'missile', shooterId: e.id, from: { ...e.pos }, to: at, hits });
-    } else if (canShoot()) {
+      fired = true;
+    } else if (canShootFrom(e.pos)) {
       e.facing = angle(e.pos, s.player.pos);
       const hit = applyDamage(s.player, spec.laserDamage, false);
       events.push({ type: 'laser', shooterId: e.id, from: { ...e.pos }, to: { ...s.player.pos }, hit });
+      fired = true;
+    }
+
+    // Phase 3: hit-and-run ships swoop back out with whatever movement is left.
+    const remaining = spec.move - stepsUsed;
+    if (hitAndRun && fired && remaining > 0) {
+      const mg = moveGrid(s, e);
+      const fill = floodFill(mg, e.pos, remaining);
+      let best: Vec | null = null;
+      let bestScore = escapeScore(s, e.pos);
+      for (const [k] of fill) {
+        const [x, y] = k.split(',').map(Number);
+        const p = { x, y };
+        if (same(p, e.pos)) continue;
+        const sc = escapeScore(s, p) + rng() * 0.3;
+        if (sc > bestScore) { bestScore = sc; best = p; }
+      }
+      if (best) {
+        const path = findPath(mg, e.pos, best, remaining);
+        if (path) {
+          e.facing = angle(path.length > 1 ? path[path.length - 2] : e.pos, best);
+          e.pos = best;
+          events.push({ type: 'move', id: e.id, path, retreat: true });
+        }
+      }
     }
     resolveDeaths(s, events);
   }
@@ -461,15 +536,29 @@ export function runEnemyTurn(s: GameState): GameEvent[] {
   return events;
 }
 
+/** Where a fighter wants to end up after firing: out of the player's guns, ideally in a cloud. */
+function escapeScore(s: GameState, p: Vec): number {
+  const d = dist(p, s.player.pos);
+  let score = Math.min(d, 6);
+  if (!canDirectHit(s, s.player.pos, p, PLAYER.laser.range)) score += 4;
+  if (cheb(p, s.player.pos) > PLAYER.flak.range) score += 2;
+  if (inNebula(s, p)) score += 3;
+  return score;
+}
+
 /** How attractive a cell is for an enemy: in range with sight is best, closer is good. */
-function scoreCell(s: GameState, e: Ship, p: Vec): number {
+function scoreCell(s: GameState, e: Ship, p: Vec, hurt: boolean): number {
   const spec = ENEMIES[e.kind as EnemyKind];
-  const g = gridInfo(s);
   const d = dist(p, s.player.pos);
   let score = -d;
-  const los = hasLineOfSight(g, p, s.player.pos);
-  if (d <= spec.laserRange + 0.5 && los) score += 10;
+  if (canDirectHit(s, p, s.player.pos, spec.laserRange)) score += 10;
   if (d < spec.standoff - 0.5) score -= 3;
   if (spec.missileRange > 0 && d <= spec.missileRange + 0.5 && d > 1.5) score += 4;
+  if (inNebula(s, p)) score += hurt ? 9 : 1.5;
+  if (hurt) {
+    // Wounded ships would rather be out of the player's reach than in a firing position.
+    score += canDirectHit(s, s.player.pos, p, PLAYER.laser.range) ? -6 : 3;
+    if (e.kind === 'warlord' || e.kind === 'battlecruiser') score += 5; // capital ships keep fighting
+  }
   return score;
 }

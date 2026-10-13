@@ -36,9 +36,18 @@ fighters close in and flak them all at once, keep an asteroid between you and th
 battlecruiser's laser while your missiles arc over it.
 
 Shields absorb damage before hull. Hull does not regenerate except by repair pickups and a small
-bonus between waves. Pickups on the field give energy, shield, missiles or hull repair.
+bonus between waves.
 
-Enemies: **Fighters** (fast, fragile, hunt in packs), **Corvettes** (quick raiders),
+**Nebula clouds** (purple) hide whoever sits inside them: lasers and the railgun can only hit a
+hidden ship from an adjacent cell. Missiles and flak still land, so a nebula buys time, not
+safety. Enemies use them too, and wounded ships will run for one.
+
+**Loot**: two or three pickups per wave, and destroyed ships have a chance to drop one. Energy
+cell, shield charge, missile crate, repair kit, rail capacitor (resets the railgun cooldown),
+overdrive (an extra action right now) and salvage (score).
+
+Enemies: **Fighters** (fast, fragile, hit and run: they swoop in, fire and pull back out of
+your laser range or into a cloud), **Corvettes** (quick raiders, same tactics),
 **Cruisers** (balanced), **Destroyers** (slow, armoured, fire missiles), enemy
 **Battlecruisers** (a match for your own ship) and the **Warlord** boss every fifth wave.
 Enemies scale up after wave 5.

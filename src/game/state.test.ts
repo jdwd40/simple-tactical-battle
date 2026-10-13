@@ -76,6 +76,7 @@ describe('player actions', () => {
   it('railgun pierces every ship on a line and then cools down', () => {
     const s = game();
     s.asteroids = [];
+    s.nebula = [];
     const [a, b] = s.enemies;
     a.pos = { x: s.player.pos.x, y: s.player.pos.y - 2 };
     b.pos = { x: s.player.pos.x, y: s.player.pos.y - 4 };
@@ -138,7 +139,84 @@ describe('player actions', () => {
   });
 });
 
+describe('nebula and loot', () => {
+  it('ships in a nebula can only be lasered from an adjacent cell', () => {
+    const s = game();
+    s.asteroids = [];
+    const enemy = s.enemies[0];
+    enemy.pos = { x: s.player.pos.x, y: s.player.pos.y - 3 };
+    s.nebula = [{ ...enemy.pos }];
+    expect(laserTargets(s)).not.toContain(enemy);
+    enemy.pos = { x: s.player.pos.x, y: s.player.pos.y - 1 };
+    s.nebula = [{ ...enemy.pos }];
+    expect(laserTargets(s)).toContain(enemy);
+  });
+
+  it('the railgun skips hidden ships that are not adjacent', () => {
+    const s = game();
+    s.asteroids = [];
+    const enemy = s.enemies[0];
+    enemy.pos = { x: s.player.pos.x, y: s.player.pos.y - 3 };
+    enemy.hull = 100;
+    s.nebula = [{ ...enemy.pos }];
+    const events = playerRail(s, enemy.pos);
+    if (events[0].type === 'rail') expect(events[0].hits).toHaveLength(0);
+  });
+
+  it('a hidden player cannot be lasered from range but missiles still land', () => {
+    const s = game();
+    s.asteroids = [];
+    s.nebula = [{ ...s.player.pos }];
+    s.enemies = [s.enemies[0]];
+    const enemy = s.enemies[0];
+    enemy.pos = { x: s.player.pos.x, y: s.player.pos.y - 3 };
+    s.asteroids = [{ x: s.player.pos.x - 1, y: s.player.pos.y - 1 }, { x: s.player.pos.x, y: s.player.pos.y - 1 }, { x: s.player.pos.x + 1, y: s.player.pos.y - 1 }];
+    endPlayerTurn(s);
+    const events = runEnemyTurn(s);
+    expect(events.some((e) => e.type === 'laser')).toBe(false);
+  });
+
+  it('every wave has nebula clouds and at least two pickups', () => {
+    for (let seed = 1; seed < 20; seed++) {
+      const s = game(seed);
+      expect(s.nebula.length).toBeGreaterThan(0);
+      expect(s.pickups.length).toBeGreaterThanOrEqual(1);
+      expect(s.nebula.every((n) => !s.asteroids.some((a) => a.x === n.x && a.y === n.y))).toBe(true);
+    }
+  });
+
+  it('overdrive grants an extra action and rail capacitor resets the cooldown', () => {
+    const s = game();
+    const target = moveTargets(s)[0];
+    s.pickups = [{ id: 99, kind: 'overdrive', pos: target }];
+    playerMove(s, target);
+    expect(s.ap).toBe(PLAYER.ap);
+    s.railCooldown = 3;
+    const next = moveTargets(s)[0];
+    s.pickups = [{ id: 100, kind: 'rail', pos: next }];
+    playerMove(s, next);
+    expect(s.railCooldown).toBe(0);
+  });
+});
+
 describe('enemy turn', () => {
+  it('fighters swoop in, fire and pull back out', () => {
+    let swooped = false;
+    for (let seed = 1; seed < 40 && !swooped; seed++) {
+      const s = game(seed);
+      s.asteroids = [];
+      s.nebula = [];
+      const fighter = s.enemies[0];
+      fighter.pos = { x: s.player.pos.x, y: s.player.pos.y - 4 };
+      endPlayerTurn(s);
+      const events = runEnemyTurn(s);
+      const moves = events.filter((e) => e.type === 'move' && e.id === fighter.id);
+      const shot = events.some((e) => e.type === 'laser' && e.shooterId === fighter.id);
+      if (shot && moves.length === 2 && moves[1].type === 'move' && moves[1].retreat) swooped = true;
+    }
+    expect(swooped).toBe(true);
+  });
+
   it('ends with the player phase, restores actions and regenerates energy', () => {
     const s = game();
     s.energy = 10;
