@@ -30,7 +30,6 @@ async function open(page: Page, url: string) {
 }
 const phase = (page: Page) => page.locator('[aria-current="step"]')
 const weapon = (page: Page) => page.getByRole('group', { name: 'Weapon' })
-const assessment = (page: Page) => page.getByRole('region', { name: /^Turn \d+ assessment$/ })
 const ending = (page: Page) => page.getByRole('region', { name: 'Encounter over' })
 async function seek(page: Page, tick: number) {
   await page.getByLabel('Playback position').fill(String(tick))
@@ -91,7 +90,7 @@ test('laser duel to victory: lock, cost, cooldown, replay before effects, reveal
   await page.getByRole('button', { name: 'Commit turn 3' }).click()
   await expect(weapon(page).getByRole('radio', { name: 'Laser' })).toBeDisabled()
   await page.getByRole('button', { name: 'Skip to end' }).click()
-  await expect(assessment(page)).toContainText('Laser fired at 0.1 s.')
+  await expect(page.getByTestId('combat-summary')).toContainText('Laser hit contact-1.')
   await expect(page.getByText('Energy −18.0 (laser).')).toBeVisible()
 
   // Replay: nothing before tick 201, the beam and impact at 201, cooldown until 251.
@@ -124,7 +123,7 @@ test('laser duel to victory: lock, cost, cooldown, replay before effects, reveal
   await page.screenshot({ path: testInfo.outputPath('duel-laser-awaiting-lock-1366x768.png') })
   await page.getByRole('button', { name: 'Commit turn 5' }).click()
   await page.getByRole('button', { name: 'Skip to end' }).click()
-  await expect(assessment(page)).toContainText('Laser fired at 3.3 s.')
+  await expect(page.getByTestId('combat-summary').locator('li[data-kind="hit"]')).toHaveText('3.3 sLaser hit contact-1.')
   await page.getByRole('button', { name: 'Plan turn 6' }).click()
   await planAndCommit(page, 5)
   await page.getByRole('button', { name: 'Skip to end' }).click()
@@ -145,7 +144,7 @@ test('laser duel to victory: lock, cost, cooldown, replay before effects, reveal
   await expect(page.getByTestId('outcome')).toHaveText('Victory')
   await expect(page.getByTestId('outcome')).toBeInViewport()
   await expect(page.locator('.event-item[data-kind="outcome"]')).toHaveText(/Encounter result: victory\./)
-  await expect(page.locator('[aria-live="polite"]')).toHaveText('Encounter over: Victory')
+  await expect(page.locator('p.sr-only[aria-live="polite"]')).toHaveText('Encounter over: Victory')
   await page.screenshot({ path: testInfo.outputPath('duel-victory-1366x768.png') })
 
   // Replay of the finished duel hides the result until playback reaches it again.
@@ -176,7 +175,7 @@ test('defeat against a firing opponent: own destruction at its tick, the turn co
   await planAndCommit(page, 2)
   await page.getByRole('button', { name: 'Skip to end' }).click()
   await expect(page.getByText('Hit: 35 shields and 0 hull lost.')).toBeVisible()
-  await expect(assessment(page)).toContainText('Shields -35, hull 0.')
+  await expect(page.getByTestId('damage-taken')).toContainText('Damage taken: 35 shields, 0 hull')
   await page.getByRole('button', { name: 'Replay turn 3' }).click()
   await page.getByRole('button', { name: 'Pause' }).click()
   await seek(page, 201)
@@ -194,7 +193,8 @@ test('defeat against a firing opponent: own destruction at its tick, the turn co
   await seek(page, 500)
   await expect(page.locator('.event-item[data-kind="own-destruction"]')).toHaveCount(0)
   await seek(page, 501)
-  await expect(page.getByText('Shadow-Dancer destroyed.')).toBeVisible()
+  await expect(page.locator('.event-item[data-kind="own-destruction"]')).toContainText('Shadow-Dancer destroyed.')
+  await expect(page.getByTestId('combat-feed')).toContainText('Shadow-Dancer destroyed.')
   expect((await drawn(page)).ownState).toBe('destroyed')
   await seek(page, 599)
   await expect(phase(page)).toHaveText('Execution')
@@ -254,7 +254,7 @@ test('an unfired laser at a last-known contact is explained from the assessment,
   await expect.poll(async () => (await drawn(page)).tick, { timeout: 5000 }).toBeGreaterThanOrEqual(205)
   expect((await drawn(page)).transition).toBe('snap')
   await page.getByRole('button', { name: 'Skip to end' }).click()
-  await expect(assessment(page)).toContainText('Laser did not fire: the target was never detected as current. The intent does not carry into the next turn.')
+  await expect(page.getByTestId('unfired')).toHaveText('Laser did not fire: no current lock on the target.')
   await expect(page.getByTestId('own-laser')).toHaveText('Ready')
   expect(errors).toEqual([])
 })

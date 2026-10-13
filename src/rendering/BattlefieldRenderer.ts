@@ -40,6 +40,8 @@ export interface RendererDiagnostics {
   readonly created: number
   readonly destroyed: number
   readonly live: number
+  /** Static terrain redraws (layout or resize), across all renderers. */
+  readonly terrainDraws: number
   readonly last: DrawSummary | null
 }
 
@@ -64,7 +66,7 @@ export interface DrawSummary {
   readonly contacts: readonly { readonly alias: string; readonly kind: string; readonly at: ScreenPoint; readonly radiusPx: number; readonly filled: boolean; readonly selected: boolean; readonly label: string }[]
 }
 
-const counters = { created: 0, destroyed: 0 }
+const counters = { created: 0, destroyed: 0, terrainDraws: 0 }
 let lastSummary: DrawSummary | null = null
 
 export function rendererDiagnostics(): RendererDiagnostics {
@@ -76,6 +78,9 @@ const RING_STYLE: Record<PlotSensorRing['kind'], { dash: number; gap: number; wi
   tracking: { dash: 8, gap: 4, width: 1.75, alpha: 0.9, label: 'Tracking reach (nominal)' },
   'pulse-preview': { dash: 5, gap: 6, width: 1.5, alpha: 0.7, label: 'Pulse reach if funded' },
 }
+
+const terrainKey = (map: PublicMap, unitsPerCell: number) =>
+  `${map.columns}x${map.rows}@${unitsPerCell}:${map.asteroidCells.map((cell) => `${cell.column},${cell.row}`).join(';')}`
 
 /** Deterministic value in [0, 1) for fixed decoration (stars, rock outlines); never game data. */
 function noise(a: number, b: number): number {
@@ -99,6 +104,7 @@ const LABEL_STYLE: TextStyleOptions = { fontFamily: PLOT_FONT, fontSize: 13, fon
 /** Reuses Text objects between redraws so animation frames do not churn GPU textures. */
 class LabelPool {
   private readonly labels = new Map<string, Text>()
+  private readonly fills = new Map<string, number>()
   private used = new Set<string>()
   constructor(private readonly layer: Container) {}
 
@@ -113,7 +119,11 @@ class LabelPool {
       this.layer.addChild(label)
     }
     if (label.text !== text) label.text = text
-    label.style.fill = fill
+    // Only touch the style when it changes: a style write re-rasterises the text.
+    if (this.fills.get(key) !== fill) {
+      label.style.fill = fill
+      this.fills.set(key, fill)
+    }
     label.visible = true
     this.used.add(key)
     return label
@@ -130,6 +140,7 @@ class LabelPool {
       if (!this.used.has(key)) {
         label.destroy()
         this.labels.delete(key)
+        this.fills.delete(key)
       }
     }
   }
@@ -143,6 +154,7 @@ interface LabelOrder {
   readonly spots: readonly LabelSpot[]
   readonly nearSpots?: number
   readonly marker?: ScreenPoint
+  readonly optional?: boolean
 }
 
 /**
@@ -168,10 +180,10 @@ class TacticalLabels {
   request(order: LabelOrder) { this.orders.push(order) }
 
   /** Label for a marker at (x, y) of the given radius, preferring the spots in `prefer` order. */
-  around(key: string, text: string, fill: number, priority: number, at: ScreenPoint, radius: number, prefer?: readonly number[]) {
+  around(key: string, text: string, fill: number, priority: number, at: ScreenPoint, radius: number, prefer?: readonly number[], optional = false) {
     const { spots, nearSpots } = spotsAround(at.x, at.y, radius)
     const ordered = prefer ? [...prefer.map((index) => spots[index]), ...spots.filter((_, index) => !prefer.includes(index))] : spots
-    this.request({ key, text, fill, priority, spots: ordered, nearSpots, marker: at })
+    this.request({ key, text, fill, priority, spots: ordered, nearSpots, marker: at, optional })
   }
 
   end(bounds: Rect): DrawSummary['labels'] {
@@ -181,11 +193,14 @@ class TacticalLabels {
       // Measured text size (estimated where no renderer measures text).
       const width = Number.isFinite(label.width) ? label.width : order.text.length * 7
       const height = Number.isFinite(label.height) ? label.height : 16
-      return { key: order.key, width, height, priority: order.priority, spots: order.spots, nearSpots: order.nearSpots, marker: order.marker }
+      return { key: order.key, width, height, priority: order.priority, spots: order.spots, nearSpots: order.nearSpots, marker: order.marker, optional: order.optional }
     }), this.markers, bounds)
     const g = this.leaders.clear()
     const byKey = new Map(this.orders.map((order) => [order.key, order]))
     const summary: DrawSummary['labels'][number][] = []
+    // Supplementary labels with no clear spot are left out this frame.
+    const placedKeys = new Set(placements.map((placement) => placement.key))
+    for (const [key, label] of texts) if (!placedKeys.has(key)) label.visible = false
     for (const placement of placements) {
       const order = byKey.get(placement.key)!
       const label = texts.get(placement.key)!
@@ -280,7 +295,8 @@ export class BattlefieldRenderer {
   }
 
   update(frame: RendererFrame) {
-    const terrainChanged = this.frame?.map !== frame.map || this.frame?.unitsPerCell !== frame.unitsPerCell
+    // Compare the public map by content: an equal map in a new object (each phase) is no change.
+    const terrainChanged = this.frame === null || terrainKey(this.frame.map, this.frame.unitsPerCell) !== terrainKey(frame.map, frame.unitsPerCell)
     this.frame = frame
     if (!this.app || this.disposed) return
     if (terrainChanged) this.layoutAndDrawTerrain()
@@ -356,11 +372,14 @@ export class BattlefieldRenderer {
     const width = columns * cellPx
     const height = rows * cellPx
     const g = this.layers.terrain.clear()
+    counters.terrainDraws += 1
 
     // Depth: a recessed field with a faint, fixed starfield and an inner edge shadow.
     g.rect(originX, originY, width, height).fill({ color: PLOT_COLOURS.space })
-    for (let star = 0; star < 160; star += 1) {
-      g.circle(originX + noise(star, 1) * width, originY + noise(star, 2) * height, 0.45 + noise(star, 3) * 1.05)
+    for (let star = 0; star < 140; star += 1) {
+      // Tiny squares read as stars at this size and cost a fraction of circles to build.
+      const size = 0.8 + noise(star, 3) * 1.4
+      g.rect(originX + noise(star, 1) * width, originY + noise(star, 2) * height, size, size)
         .fill({ color: PLOT_COLOURS.star, alpha: 0.1 + noise(star, 4) * 0.32 })
     }
     for (let ring = 0; ring < 6; ring += 1) {
@@ -413,6 +432,11 @@ export class BattlefieldRenderer {
       g.rect(rect.x, rect.y, rect.size, rect.size).stroke({ width: 1, color: PLOT_COLOURS.edge, alignment: 1 })
     }
     g.rect(originX, originY, width, height).stroke({ width: 1, color: PLOT_COLOURS.edge, alignment: 0 })
+    // Terrain is static between resizes: render it once to a texture instead of every frame.
+    if (g.cacheAsTexture) {
+      g.cacheAsTexture(false)
+      g.cacheAsTexture({ resolution: app.renderer.resolution, antialias: true })
+    }
 
     // Coordinate labels match the zero-based column/row numbers used for keyboard entry.
     const labelEvery = cellPx >= 22 ? 1 : 5
@@ -483,7 +507,7 @@ export class BattlefieldRenderer {
         ? [{ x: at.x, y: at.y + radiusPx + 9, ax: 0.5 }, { x: at.x, y: at.y - radiusPx - 9, ax: 0.5 }]
         : [{ x: at.x, y: at.y - radiusPx - 9, ax: 0.5 }, { x: at.x, y: at.y + radiusPx + 9, ax: 0.5 }]
       spots.push({ x: at.x + radiusPx + 6, y: at.y - 12, ax: 0 }, { x: at.x - radiusPx - 6, y: at.y - 12, ax: 1 })
-      labels.request({ key: `ring:${ring.kind}`, text: style.label, fill: PLOT_COLOURS.sonar, priority: 10, spots: spots.map((spot) => ({ x: spot.x, y: spot.y, anchorX: spot.ax, anchorY: 0.5 })) })
+      labels.request({ key: `ring:${ring.kind}`, text: style.label, fill: PLOT_COLOURS.sonar, priority: 10, optional: true, spots: spots.map((spot) => ({ x: spot.x, y: spot.y, anchorX: spot.ax, anchorY: 0.5 })) })
       drawn.push({ kind: ring.kind, radiusPx })
     }
     return drawn
@@ -530,12 +554,12 @@ export class BattlefieldRenderer {
     const nominal = toScreen(transform, plan.nominal)
     const reachesDestination = Math.abs(nominal.x - centre.x) < destination.size / 2 && Math.abs(nominal.y - centre.y) < destination.size / 2
     if (reachesDestination) {
-      labels.around('nominal', 'Reached this turn (predicted)', PLOT_COLOURS.command, 55, centre, destination.size / 2 + 8, [5, 7, 4, 6])
+      labels.around('nominal', 'Reached this turn (predicted)', PLOT_COLOURS.command, 55, centre, destination.size / 2 + 8, [5, 7, 4, 6], true)
       return
     }
     g.circle(nominal.x, nominal.y, 5).fill({ color: PLOT_COLOURS.well }).stroke({ width: 2, color: PLOT_COLOURS.command })
     labels.reserve(nominal.x, nominal.y, 6)
-    labels.around('nominal', 'Turn end (predicted)', PLOT_COLOURS.command, 55, nominal, 7, [5, 3, 7, 0, 1])
+    labels.around('nominal', 'Turn end (predicted)', PLOT_COLOURS.command, 55, nominal, 7, [5, 3, 7, 0, 1], true)
   }
 
   /** Intended weapon use: laser line and range to its target alias, or missile line, aim mark and blast. */
@@ -557,12 +581,12 @@ export class BattlefieldRenderer {
       }
       g.stroke({ width: 1.25, color: PLOT_COLOURS.command, alpha: 0.6 })
       const spot = [{ x: from.x, y: from.y + radiusPx + 9 }, { x: from.x, y: from.y - radiusPx - 9 }].find((point) => insideBounds(bounds, point.x, point.y))
-      if (spot) labels.request({ key: 'laser-range', text: 'Laser range', fill: PLOT_COLOURS.command, priority: 15, spots: [{ x: spot.x, y: spot.y, anchorX: 0.5, anchorY: 0.5 }] })
+      if (spot) labels.request({ key: 'laser-range', text: 'Laser range', fill: PLOT_COLOURS.command, priority: 15, optional: true, spots: [{ x: spot.x, y: spot.y, anchorX: 0.5, anchorY: 0.5 }] })
       if (weapon.target) {
         const to = toScreen(transform, weapon.target)
         // Current lock: long dashes; last sighting: short dots (it may never fire).
         strokeDashes([from, to], weapon.current ? 10 : 3, weapon.current ? 5 : 5, 2, 0.95)
-        labels.around('laser-target', weapon.current ? 'Laser target' : 'Laser target (needs a new lock)', PLOT_COLOURS.command, 45, { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }, 4, [4, 6, 0, 1])
+        labels.around('laser-target', weapon.current ? 'Laser target' : 'Laser target (needs a new lock)', PLOT_COLOURS.command, 45, { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }, 4, [4, 6, 0, 1], true)
       }
       return
     }
@@ -578,7 +602,7 @@ export class BattlefieldRenderer {
     g.moveTo(centre.x - r, centre.y - r).lineTo(centre.x + r, centre.y + r).moveTo(centre.x + r, centre.y - r).lineTo(centre.x - r, centre.y + r)
       .stroke({ width: 1.5, color: PLOT_COLOURS.command })
     labels.reserve(centre.x, centre.y, r + 1)
-    labels.around('missile-aim', 'Missile aim', PLOT_COLOURS.command, 50, centre, r, [4, 0, 6, 1])
+    labels.around('missile-aim', 'Missile aim', PLOT_COLOURS.command, 50, centre, r, [4, 0, 6, 1], true)
   }
 
   /** Own missile telemetry, observed hostile ordnance and recent recorded shot/impact marks. */

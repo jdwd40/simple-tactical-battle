@@ -44,6 +44,11 @@ describe('tactical label layout', () => {
     expect(new Set(placed.map((entry) => `${entry.rect.left},${entry.rect.top}`)).size).toBe(placed.length)
   })
 
+  it('leaves out a supplementary label with no clear spot instead of overlapping', () => {
+    const blocked = { key: 'note', width: 400, height: 16, priority: 10, spots: [{ x: 300, y: 300, anchorX: 0, anchorY: 0.5 }], optional: true }
+    expect(layoutLabels([label('contact', 300, 300, 80), blocked], [marker(300, 300)], bounds).map((entry) => entry.key)).toEqual(['contact'])
+  })
+
   it('anchors rectangles from the text anchor', () => {
     expect(rectAt({ x: 100, y: 50, anchorX: 1, anchorY: 0.5 }, 40, 10)).toEqual({ left: 60, top: 45, right: 100, bottom: 55 })
   })

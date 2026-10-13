@@ -18,7 +18,7 @@
 .segmented-legend { float: left; padding: 0; font-weight: 600; }
 .segmented-options { display: flex; }
 .segmented-option { position: relative; }
-.segmented-option input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.segmented-option input { position: absolute; inset: 0; z-index: 2; opacity: 0; margin: 0; cursor: pointer; }
 .segmented-option span {
   display: inline-flex;
   align-items: center;
@@ -167,7 +167,7 @@
 .resource-row { display: grid; grid-template-columns: 4.25rem minmax(0, 1fr) auto; align-items: center; gap: 0.625rem; }
 .resource-label { color: var(--color-ink-muted); }
 .resource-track { position: relative; height: 0.625rem; border: 1px solid var(--color-seam); background: var(--color-well); overflow: hidden; }
-.resource-fill { position: absolute; inset: 0 auto 0 0; background: var(--color-command); transition: width var(--duration-quick) ease-out; }
+.resource-fill { position: absolute; inset: 0 auto 0 0; background: var(--color-command); }
 .resource-row[data-resource="shields"] .resource-fill { background: var(--color-sonar); }
 .resource-row[data-resource="hull"] .resource-fill { background: var(--color-ink-muted); }
 .resource-lost {
@@ -188,4 +188,11 @@
 @media (max-width: 759px) {
   .combat-feed { bottom: 0.5rem; width: calc(100% - 1rem); }
   .combat-cue { padding: 0.25rem 0.5rem; font-size: var(--text-meta); }
+}
+
+/* Landscape phones: the status strip as one line of three short bars. */
+@media (max-height: 540px) and (min-width: 560px) and (max-width: 1023px) {
+  .deck-hud .resource-bars.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 0.75rem; }
+  .deck-hud .resource-bars.compact .resource-row { grid-template-columns: auto minmax(1.5rem, 1fr) auto; gap: 0.375rem; }
+  .deck-hud .resource-bars.compact .resource-value { min-width: 0; }
 }

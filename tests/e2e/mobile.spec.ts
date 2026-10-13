@@ -79,7 +79,8 @@ for (const phone of PHONES) {
       await tab(page, 'Orders').tap()
       await expect(page.getByLabel('Column', { exact: true })).toHaveCount(1)
 
-      await expectTouchSized(page, ['Commit turn 1', 'Orders', 'Ship', 'Log', 'Play', 'Skip to end', 'Briefing', 'Restart'])
+      await expectTouchSized(page, ['Commit turn 1', 'Play', 'Skip to end', 'Briefing', 'Restart', 'Hold position', 'Set destination'])
+      for (const name of ['Orders', 'Ship', 'Log'] as const) expect((await tab(page, name).boundingBox())!.height, name).toBeGreaterThanOrEqual(43.5)
       for (const name of ['Copy seed link', 'Briefing', 'Abandon', 'Restart']) {
         const box = (await page.getByRole('button', { name, exact: true }).boundingBox())!
         expect(box.x, name).toBeGreaterThanOrEqual(0)

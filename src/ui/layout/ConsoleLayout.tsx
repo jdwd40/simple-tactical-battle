@@ -35,7 +35,8 @@ export function ConsoleLayout({ header, shipRail, battlefield, transport, comman
       <header className="console-header">{header}</header>
       <main className="console-deck" data-mobile-tab={mobileTab}>
         {hud && <div className="deck-hud" aria-hidden="true">{hud}</div>}
-        <div className="rail deck-ship" id={`${id}-ship`} data-mobile-panel="ship">{shipRail}</div>
+        {/* Named, because a rail that overflows becomes a keyboard scroll stop. */}
+        <div className="rail deck-ship" id={`${id}-ship`} data-mobile-panel="ship" role="region" aria-label="Ship status">{shipRail}</div>
         <div className="deck-plot plot-well">{battlefield}</div>
         <div className="deck-transport">{transport}</div>
         {onMobileTab && (

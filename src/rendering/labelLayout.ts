@@ -20,6 +20,8 @@ export interface LabelRequest {
   readonly nearSpots?: number
   /** The marker the label names, for its leader line. */
   readonly marker?: { readonly x: number; readonly y: number }
+  /** Supplementary text (also shown elsewhere): left out rather than placed over anything. */
+  readonly optional?: boolean
 }
 
 export interface LabelPlacement {
@@ -49,7 +51,8 @@ function outsideArea(rect: Rect, bounds: Rect): number {
 
 /**
  * Spots around a marker of radius `radius`: right, left, above, below and the four diagonals at
- * `gap`, then the same eight further out. The first eight are "near" (no leader needed).
+ * `gap` (the "near" spots, no leader needed), then the same eight further out, then twelve
+ * directions further still, so a crowded corner or map edge still has somewhere clear to go.
  */
 export function spotsAround(x: number, y: number, radius: number, gap = 5): { spots: LabelSpot[]; nearSpots: number } {
   const ring = (d: number): LabelSpot[] => [
@@ -62,8 +65,14 @@ export function spotsAround(x: number, y: number, radius: number, gap = 5): { sp
     { x: x - d * 0.75, y: y - d * 0.75, anchorX: 1, anchorY: 1 },
     { x: x - d * 0.75, y: y + d * 0.75, anchorX: 1, anchorY: 0 },
   ]
+  const far = (d: number): LabelSpot[] => Array.from({ length: 12 }, (_, k) => {
+    const angle = (k / 12) * Math.PI * 2
+    const cos = Math.cos(angle)
+    const sin = Math.sin(angle)
+    return { x: x + cos * d, y: y + sin * d, anchorX: cos > 0.3 ? 0 : cos < -0.3 ? 1 : 0.5, anchorY: sin > 0.3 ? 0 : sin < -0.3 ? 1 : 0.5 }
+  })
   const near = ring(radius + gap)
-  return { spots: [...near, ...ring(radius + gap + 26)], nearSpots: near.length }
+  return { spots: [...near, ...ring(radius + gap + 22), ...far(radius + gap + 46)], nearSpots: near.length }
 }
 
 /**
@@ -84,7 +93,7 @@ export function layoutLabels(requests: readonly LabelRequest[], obstacles: reado
       if (!best || cost < best.cost) best = { spot, rect, cost, index }
       if (cost === 0) break
     }
-    if (!best) continue
+    if (!best || (best.cost > 0 && request.optional)) continue
     placed.push(best.rect)
     result.push({
       key: request.key, spot: best.spot, rect: best.rect, overlap: best.cost,

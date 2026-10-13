@@ -45,7 +45,9 @@ export function SeedControl({ seed }: { seed: number }) {
   return (
     <div className="seed-control">
       <span className="seed-readout">Seed <span data-testid="seed">{seed}</span></span>
-      <ConsoleButton variant="quiet" aria-describedby="seed-help" onClick={copy}>Copy seed link</ConsoleButton>
+      <ConsoleButton variant="quiet" aria-label="Copy seed link" aria-describedby="seed-help" onClick={copy}>
+        <span className="label-full">Copy seed link</span><span className="label-short" aria-hidden="true">Copy link</span>
+      </ConsoleButton>
       <span id="seed-help" className="sr-only">Copies a link that starts this same encounter again.</span>
       <span className="sr-only" role="status">{status}</span>
     </div>

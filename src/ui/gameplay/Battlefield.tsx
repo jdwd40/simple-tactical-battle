@@ -5,6 +5,9 @@ import type { PlotScene } from '../../rendering/plotScene'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 import './gameplay.css'
 
+/** Tick intervals shorter than this (for example 4× speed) are drawn tick by tick, not tweened. */
+const MIN_TWEEN_MS = 40
+
 export interface BattlefieldPlayback {
   readonly playing: boolean
   readonly speed: number
@@ -75,9 +78,11 @@ export function Battlefield({ encounterId, map, rules, scene, playback, selectab
     // Smooth only while actively playing with motion allowed. A republish of the same tick
     // during playback continues the current tween; pause, seek or reduced motion snap.
     const previous = previousSceneRef.current
-    const animating = playback?.playing === true && !reducedMotion && previous !== null
+    const durationMs = playback ? rules.timing.tickMs / playback.speed : 0
+    // A tween shorter than a frame shows nothing and only costs redraws: snap at high speeds.
+    const animating = playback?.playing === true && !reducedMotion && previous !== null && durationMs >= MIN_TWEEN_MS
     const smoothing = !animating || !playback ? null
-      : scene.tick === previous.tick + 1 ? { from: previous, durationMs: rules.timing.tickMs / playback.speed }
+      : scene.tick === previous.tick + 1 ? { from: previous, durationMs }
         : scene.tick === previous.tick ? 'continue' as const
           : null
     renderer.update({ map, unitsPerCell: rules.geometry.unitsPerCell, tickMs: rules.timing.tickMs, scene, smoothing, selectable, pointerMode, reducedMotion })

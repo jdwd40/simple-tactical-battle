@@ -40,7 +40,8 @@ test('opens in genuine turn-1 planning with own data only and a deliberate Commi
   await expect(page.locator('canvas')).toHaveCount(1)
 
   const own = page.getByRole('region', { name: 'Own ship', exact: true })
-  await expect(own.locator('dd')).toHaveText(['100.0 / 100.0', '40 / 40', '100 / 100', '6 / 6', 'Ready', 'Ready', 'Passive', 'On', 'Not exposed'])
+  await expect(own.locator('.resource-value')).toHaveText(['100.0 / 100.0', '40 / 40', '100 / 100'])
+  await expect(own.locator('dd')).toHaveText(['6 / 6', 'Ready', 'Ready', 'Passive', 'On', 'Not exposed'])
   const readout = page.locator('#plot-readout')
   await expect(readout).toContainText('Positioncolumn 3, row 10')
   await expect(readout).toContainText('No contacts.')
@@ -111,6 +112,8 @@ test('keyboard reaches every control in planning-flow order with a visible focus
   await expectFocusRing('Skip to orders')
   for (const name of ['Copy seed link', 'Briefing', 'Abandon', 'Restart', 'Back', 'Play', 'Forward', 'Skip to end', 'Column']) {
     await page.keyboard.press('Tab')
+    // A rail that overflows is a named keyboard scroll stop (Chromium focusable scrollers).
+    if (name === 'Back' && await page.locator(':focus').getAttribute('aria-label') === 'Ship status') await page.keyboard.press('Tab')
     await expectFocusRing(name)
   }
   await page.locator('.skip-link').focus()
@@ -128,9 +131,13 @@ for (const viewport of [{ width: 1024, height: 700 }, { width: 390, height: 844 
     expect((await pageOverflow(page)).horizontal).toBe(0)
     const plot = await box(page, '.deck-plot')
     expect(plot.y).toBeLessThan(viewport.height / 2)
-    for (const region of ['Own ship', 'Plot readout', 'Orders', 'Event log']) {
-      await expect(page.getByRole('region', { name: region })).toBeAttached()
+    // On phones the Ship and Log panels are behind tabs; on wider layouts all are shown.
+    const tabs = page.getByRole('tablist', { name: 'Console panels' })
+    for (const [region, panelTab] of [['Orders', 'Orders'], ['Own ship', 'Ship'], ['Plot readout', 'Ship'], ['Event log', 'Log']] as const) {
+      if (await tabs.isVisible()) await tabs.getByRole('tab', { name: panelTab }).click()
+      await expect(page.getByRole('region', { name: region, exact: true })).toBeVisible()
     }
+    if (await tabs.isVisible()) await tabs.getByRole('tab', { name: 'Orders' }).click()
     const commit = page.getByRole('button', { name: 'Commit turn 1' })
     await commit.scrollIntoViewIfNeeded()
     await expect(commit).toBeInViewport()

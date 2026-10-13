@@ -170,7 +170,7 @@ body { margin: 0; min-width: 320px; }
 }
 
 /* Phone-only pieces: hidden on larger layouts. */
-.deck-hud, .deck-tabs { display: none; }
+.deck-hud, .deck-tabs, .label-short { display: none; }
 
 /*
  * Phones, portrait: header, status strip, a square plot, playback, panel tabs, then the chosen
@@ -184,31 +184,52 @@ body { margin: 0; min-width: 320px; }
     grid-template-areas: "hud" "plot" "transport" "tabs" "ship" "command";
   }
   .deck-plot { aspect-ratio: 1 / 1; padding: 0.25rem; }
+  .deck-hud { grid-area: hud; }
+  .deck-tabs { grid-area: tabs; }
   .rail { overflow: visible; }
 }
 
-/* Phones, landscape: plot on the left at full height, the panels column on the right. */
+/*
+ * Phones, landscape: a full-height square plot pinned on the left; on the right, in order, the
+ * status strip, playback, panel tabs and the chosen panel, scrolling with Commit Turn pinned.
+ */
 @media (max-height: 540px) and (min-width: 560px) and (max-width: 1023px) {
-  .console { height: 100dvh; min-height: 0; }
+  .console { height: auto; min-height: 100dvh; }
   .console-deck {
-    grid-template-columns: min(58vw, calc(100dvh - 7.25rem)) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas: "plot side" "transport side";
+    grid-template-columns: min(56vw, calc(100dvh - 3.75rem)) minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas: none;
   }
-  .deck-plot { padding: 0.25rem; }
-  .deck-hud, .deck-tabs, .deck-ship, .deck-command { grid-area: side; }
-  .deck-hud, .deck-tabs { align-self: start; }
+  .deck-plot {
+    grid-area: 1 / 1 / span 5 / 2;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: min(56vw, calc(100dvh - 3.75rem));
+    padding: 0.25rem;
+  }
+  /* Reset the named areas from the larger layouts, then stack in the right column. */
+  .deck-hud, .deck-transport, .deck-tabs, .deck-ship, .deck-command { grid-area: auto / 2 / auto / 3; }
+  .deck-hud { order: 1; }
+  .deck-transport { order: 2; }
+  .deck-tabs { order: 3; }
+  .deck-ship { order: 4; }
+  .deck-command { order: 5; }
+  .rail { overflow: visible; }
+  .transport { padding: 0.5rem 0.75rem; }
 }
 
 /* Shared phone behaviour (both orientations). */
 @media (max-width: 759px), (max-height: 540px) and (min-width: 560px) and (max-width: 1023px) {
   .console-header { gap: 0.375rem 0.75rem; padding: 0.375rem 0.75rem; }
+  .label-full { display: none; }
+  .label-short { display: inline; }
   .ship-name { font-size: var(--text-title); line-height: var(--text-title--line-height); }
   .mission-line { display: none; }
   .phase-step:not([aria-current="step"]) { display: none; }
   .phase-step + .phase-step::before { display: none; }
-  .deck-hud { display: block; grid-area: hud; padding: 0.375rem 0.75rem; background: var(--color-bulkhead); }
-  .deck-tabs { display: flex; grid-area: tabs; gap: 0; background: var(--color-hull); border-top: 1px solid var(--color-seam); border-bottom: 1px solid var(--color-seam); }
+  .deck-hud { display: block; padding: 0.375rem 0.75rem; background: var(--color-bulkhead); }
+  .deck-tabs { display: flex; gap: 0; background: var(--color-hull); border-top: 1px solid var(--color-seam); border-bottom: 1px solid var(--color-seam); }
   .deck-tab {
     flex: 1;
     min-height: 2.75rem;
@@ -233,14 +254,12 @@ body { margin: 0; min-width: 320px; }
   .commit-note { display: none; }
 }
 
-/* Touch: every control at least 44px tall, wider seek thumb. */
-@media (pointer: coarse), (max-width: 759px) {
-  .console-button { min-height: 2.75rem; }
-  .segmented-option span, .speed-option span { min-height: 2.75rem; }
-  .cell-entry-field input { min-height: 2.75rem; }
-  .timeline-seek { min-height: 2.75rem; }
-  .contact-select { min-height: 2.75rem; }
+/* Phones: scrolling to a control keeps it clear of the pinned Commit Turn bar. */
+@media (max-width: 759px) {
+  html { scroll-padding-bottom: 7.5rem; }
 }
+
+
 
 /* Panels: flat sections on a rail, separated by seams rather than cards. */
 .panel { padding: 0.875rem 1rem 1rem; }
@@ -433,8 +452,10 @@ body { margin: 0; min-width: 320px; }
   background: var(--color-command);
 }
 
-/* Transport bar under the plot. */
+/* Transport bar under the plot. A constant minimum height keeps the plot (and its WebGL canvas)
+   the same size in every phase, so committing never resizes and redraws the battlefield. */
 .transport {
+  min-height: 3.75rem;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -474,4 +495,13 @@ body { margin: 0; min-width: 320px; }
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Touch: every control at least 44px tall (scoped under :root so it outranks the base sizes). */
+@media (pointer: coarse), (max-width: 759px) {
+  :root .console-button { min-height: 2.75rem; }
+  :root .segmented-option span, :root .speed-option span { min-height: 2.75rem; }
+  :root .cell-entry-field input { min-height: 2.75rem; }
+  :root .timeline-seek { min-height: 2.75rem; }
+  :root .contact-select { min-height: 2.75rem; }
 }
