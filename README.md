@@ -65,3 +65,4 @@ canvas rendering and effects (`src/render`), synthesised audio (`src/audio`) and
 (`src/ui`). `src/app.ts` sequences game events into animations and sounds.
 
 No frameworks: Vite + TypeScript + Canvas 2D.
+# simple-tactical-battle
