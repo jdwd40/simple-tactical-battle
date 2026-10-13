@@ -37,7 +37,7 @@ function planning(own: Partial<OwnShipObservation> = {}, draft = orders(), issue
   }
 }
 
-const render = (view: GameView, activePulse = true) => renderToStaticMarkup(<GameConsole controller={fixtureController(view).controller} capabilities={{ activePulse }} />)
+const render = (view: GameView, activePulse = true) => renderToStaticMarkup(<GameConsole controller={fixtureController(view).controller} capabilities={{ activePulse, laser: false, missile: false }} />)
 const systems = (props: Partial<SystemOrdersProps> = {}) => renderToStaticMarkup(
   <SystemOrders
     orders={orders()} own={frameAt(200, position).observation.ownShip} tick={200} ticksResolved={0} rules={rules}
@@ -97,14 +97,14 @@ describe('GameConsole with sensors', () => {
     const html = render(planning({ turnActions: { pulseAttemptSpent: true, weaponIntentSpent: false } }))
     expect(radio(html, 'activePulse')).not.toContain('disabled')
     expect(html).toContain('Sensor drill')
-    expect(html).toContain('Weapons hold fire in this version; combat and a reactive patrol come later.')
+    expect(html).toContain('The patrol is an interim script: it follows a set route and does not fire.')
   })
 
   it('names the movement drill and disables the pulse when the engine cannot perform it', () => {
     const html = render(planning(), false)
     expect(html).toContain('Movement drill')
     expect(radio(html, 'activePulse')).toContain('disabled=""')
-    expect(html).toContain('active scans, combat and a reactive patrol come later')
+    expect(html).toContain('Lasers are not available in this version yet. Missiles are not available in this version yet.')
   })
 
   it('prompts for a fresh cloak request after an unfunded latch carried the draft off', () => {

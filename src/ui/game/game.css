@@ -55,3 +55,30 @@
 .system-warning { display: flex; gap: 0.5rem; align-items: baseline; color: var(--color-command); }
 .system-warning-glyph { flex: none; width: 0.5rem; height: 0.5rem; border: 1.5px solid currentColor; transform: rotate(45deg); }
 .energy-plan { margin-top: 0.875rem; }
+
+/* Weapon orders: laser target choice reuses the contact glyph (solid = current, dashed = last known). */
+.target-list { display: grid; gap: 0.375rem; margin: 0.625rem 0 0; padding: 0; border: 0; }
+.target-option { display: flex; align-items: baseline; gap: 0.5rem; color: var(--color-ink-muted); cursor: pointer; }
+.target-option input { accent-color: var(--color-command); }
+.target-option .contact-glyph { flex: none; width: 0.625rem; height: 0.625rem; border: 2px solid var(--color-hostile); transform: rotate(45deg); }
+.target-option[data-kind="current"] .contact-glyph { background: color-mix(in srgb, var(--color-hostile) 35%, transparent); }
+.target-option[data-kind="stale"] .contact-glyph { border-style: dashed; }
+.weapon-orders .cell-entry { margin-top: 0.625rem; }
+
+/* Ending: the outcome word is the one large element on the rail. */
+.outcome-title {
+  margin: 0 0 0.375rem;
+  font-family: var(--font-display);
+  font-size: var(--text-ship);
+  line-height: var(--text-ship--line-height);
+  font-weight: 600;
+}
+
+/* Aiming mode caption over the plot: a dashed amber frame marks the changed click meaning. */
+.aim-caption {
+  z-index: 2;
+  padding: 0.25rem 0.625rem;
+  border: 1px dashed var(--color-command);
+  background: var(--color-hull);
+  color: var(--color-ink);
+}

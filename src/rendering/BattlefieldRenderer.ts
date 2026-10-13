@@ -5,7 +5,9 @@ import { PLOT_COLOURS, PLOT_FONT } from './plotPalette'
 import {
   cellAtScreen, cellRect, fitPlot, headingToRotation, toScreen, type PlotTransform, type ScreenPoint,
 } from './plotGeometry'
-import { interpolateScene, splitPathAt, type PlotContact, type PlotScene, type PlotSensorRing } from './plotScene'
+import {
+  EFFECT_TICKS, interpolateScene, splitPathAt, type PlotContact, type PlotScene, type PlotSensorRing,
+} from './plotScene'
 
 export interface RendererCallbacks {
   onHoverCell(cell: Cell | null): void
@@ -26,6 +28,8 @@ export interface RendererFrame {
    */
   readonly smoothing: { readonly from: PlotScene; readonly durationMs: number } | 'continue' | null
   readonly selectable: boolean
+  /** What a selecting click does: set the destination, or (deliberate aiming mode) the missile aim. */
+  readonly pointerMode?: 'destination' | 'aim'
 }
 
 /** Observable lifecycle and last-drawn summary, for browser checks of cleanup and fog-of-war. */
@@ -48,6 +52,10 @@ export interface DrawSummary {
   readonly trailPoints: number
   readonly plan: string | null
   readonly sensorRings: readonly { readonly kind: PlotSensorRing['kind']; readonly radiusPx: number }[]
+  readonly weaponPlan: string | null
+  readonly ownMissiles: readonly { readonly id: string; readonly at: ScreenPoint }[]
+  readonly hostileMissiles: readonly { readonly alias: string; readonly kind: string; readonly at: ScreenPoint; readonly radiusPx: number }[]
+  readonly effects: readonly string[]
   readonly contacts: readonly { readonly alias: string; readonly kind: string; readonly at: ScreenPoint; readonly radiusPx: number; readonly selected: boolean; readonly label: string }[]
 }
 
@@ -129,6 +137,7 @@ export class BattlefieldRenderer {
     sensors: new Graphics(),
     plan: new Graphics(),
     contacts: new Graphics(),
+    ordnance: new Graphics(),
     ship: new Graphics(),
     hover: new Graphics(),
     labels: new Container(),
@@ -164,8 +173,8 @@ export class BattlefieldRenderer {
     canvas.setAttribute('aria-hidden', 'true')
     canvas.style.display = 'block'
     host.appendChild(canvas)
-    const { terrain, terrainLabels, sensors, plan, contacts, ship, hover, labels } = this.layers
-    app.stage.addChild(terrain, terrainLabels, sensors, plan, contacts, hover, ship, labels)
+    const { terrain, terrainLabels, sensors, plan, contacts, ordnance, ship, hover, labels } = this.layers
+    app.stage.addChild(terrain, terrainLabels, sensors, plan, contacts, ordnance, hover, ship, labels)
     this.terrainLabels = new LabelPool(terrainLabels)
     this.labels = new LabelPool(labels)
 
@@ -184,6 +193,7 @@ export class BattlefieldRenderer {
     if (!this.app || this.disposed) return
     if (terrainChanged) this.layoutAndDrawTerrain()
     this.app.canvas.style.cursor = frame.selectable ? 'crosshair' : 'default'
+    this.drawHover()
     const smoothing = frame.smoothing
     if (smoothing === 'continue' && this.animatingTo?.tick === frame.scene.tick) {
       this.animatingTo = frame.scene
@@ -307,6 +317,7 @@ export class BattlefieldRenderer {
     const sensorRings = this.drawSensorRings(scene, transform, labels)
     this.drawPlan(scene, transform, labels)
     const contacts = this.drawContacts(scene.contacts, transform, labels, this.frame?.tickMs ?? 100)
+    const ordnance = this.drawOrdnance(scene, transform, labels, this.frame?.tickMs ?? 100)
     const { at: ship, state: ownState } = this.drawShip(scene, transform, labels)
     labels.end()
     app.render()
@@ -323,6 +334,8 @@ export class BattlefieldRenderer {
       plan: scene.plan?.kind ?? null,
       sensorRings,
       contacts,
+      weaponPlan: scene.weaponPlan?.kind ?? null,
+      ...ordnance,
     }
   }
 
@@ -369,6 +382,8 @@ export class BattlefieldRenderer {
       g.stroke({ width: 2, color: PLOT_COLOURS.command, alpha: 0.55, join: 'round' })
     }
 
+    this.drawWeaponPlan(scene, transform, labels, strokeDashes)
+
     const plan = scene.plan
     if (!plan || plan.kind === 'hold') return
     const destination = cellRect(transform, plan.destination)
@@ -396,6 +411,132 @@ export class BattlefieldRenderer {
     }
     g.circle(nominal.x, nominal.y, 5).fill({ color: PLOT_COLOURS.well }).stroke({ width: 2, color: PLOT_COLOURS.command })
     labels.place('nominal', 'Turn end (predicted)', nominal.x + 9, nominal.y + 12, PLOT_COLOURS.command)
+  }
+
+  /** Intended weapon use: laser line and range to its target alias, or missile line, aim mark and blast. */
+  private drawWeaponPlan(
+    scene: PlotScene, transform: PlotTransform, labels: LabelPool,
+    strokeDashes: (points: readonly ScreenPoint[], dash: number, gap: number, width: number, alpha: number) => void,
+  ) {
+    const weapon = scene.weaponPlan
+    if (!weapon) return
+    const g = this.layers.plan
+    const from = toScreen(transform, scene.ownShip.position)
+    if (weapon.kind === 'laser') {
+      const radiusPx = weapon.rangeUnits * transform.scale
+      const bounds = mapBounds(transform)
+      for (const [start, end] of dashCircle(radiusPx, 10, 6)) {
+        const mid = (start + end) / 2
+        if (!insideBounds(bounds, from.x + Math.cos(mid) * radiusPx, from.y + Math.sin(mid) * radiusPx)) continue
+        g.moveTo(from.x + Math.cos(start) * radiusPx, from.y + Math.sin(start) * radiusPx).arc(from.x, from.y, radiusPx, start, end)
+      }
+      g.stroke({ width: 1.25, color: PLOT_COLOURS.command, alpha: 0.6 })
+      const spot = [{ x: from.x, y: from.y + radiusPx + 9 }, { x: from.x, y: from.y - radiusPx - 9 }].find((point) => insideBounds(bounds, point.x, point.y))
+      if (spot) labels.place('laser-range', 'Laser range', spot.x, spot.y, PLOT_COLOURS.command, 0.5)
+      if (weapon.target) {
+        const to = toScreen(transform, weapon.target)
+        // Current lock: long dashes; last sighting: short dots (it may never fire).
+        strokeDashes([from, to], weapon.current ? 10 : 3, weapon.current ? 5 : 5, 2, 0.95)
+        labels.place('laser-target', weapon.current ? 'Laser target' : 'Laser target (needs a new lock)', (from.x + to.x) / 2 + 6, (from.y + to.y) / 2 - 10, PLOT_COLOURS.command)
+      }
+      return
+    }
+    const aim = cellRect(transform, weapon.aim)
+    const centre = { x: aim.x + aim.size / 2, y: aim.y + aim.size / 2 }
+    strokeDashes([from, centre], 6, 6, 2, 0.9)
+    const blastPx = weapon.blastRadiusUnits * transform.scale
+    for (const [start, end] of dashCircle(blastPx, 3, 4)) g.moveTo(centre.x + Math.cos(start) * blastPx, centre.y + Math.sin(start) * blastPx).arc(centre.x, centre.y, blastPx, start, end)
+    g.stroke({ width: 1.25, color: PLOT_COLOURS.command, alpha: 0.8 })
+    // Aim mark: a ringed X, distinct from the destination's square.
+    const r = Math.max(5, aim.size * 0.28)
+    g.circle(centre.x, centre.y, r).stroke({ width: 2, color: PLOT_COLOURS.command })
+    g.moveTo(centre.x - r, centre.y - r).lineTo(centre.x + r, centre.y + r).moveTo(centre.x + r, centre.y - r).lineTo(centre.x - r, centre.y + r)
+      .stroke({ width: 1.5, color: PLOT_COLOURS.command })
+    labels.place('missile-aim', 'Missile aim', centre.x + r + 6, centre.y - r - 4, PLOT_COLOURS.command)
+  }
+
+  /** Own missile telemetry, observed hostile ordnance and recent recorded shot/impact marks. */
+  private drawOrdnance(scene: PlotScene, transform: PlotTransform, labels: LabelPool, tickMs: number) {
+    const g = this.layers.ordnance.clear()
+    const size = Math.max(5, transform.cellPx * 0.18)
+    const bounds = mapBounds(transform)
+    const triangle = (at: ScreenPoint, angle: number) => {
+      const point = (a: number, r: number) => [at.x + Math.cos(angle + a) * r, at.y + Math.sin(angle + a) * r]
+      return [...point(0, size * 1.4), ...point(2.5, size), ...point(-2.5, size)]
+    }
+    const ownMissiles: DrawSummary['ownMissiles'][number][] = []
+    for (const missile of scene.ownMissiles) {
+      const at = toScreen(transform, missile.position)
+      const aimRect = cellRect(transform, missile.aim)
+      const aim = { x: aimRect.x + aimRect.size / 2, y: aimRect.y + aimRect.size / 2 }
+      for (const [a, b] of dashPolyline([at, aim], 4, 5)) g.moveTo(a.x, a.y).lineTo(b.x, b.y)
+      g.stroke({ width: 1.25, color: PLOT_COLOURS.command, alpha: 0.7 })
+      g.moveTo(aim.x - 4, aim.y - 4).lineTo(aim.x + 4, aim.y + 4).moveTo(aim.x + 4, aim.y - 4).lineTo(aim.x - 4, aim.y + 4)
+        .stroke({ width: 1.5, color: PLOT_COLOURS.command })
+      g.poly(triangle(at, Math.atan2(aim.y - at.y, aim.x - at.x)), true).fill({ color: PLOT_COLOURS.command }).stroke({ width: 1, color: PLOT_COLOURS.commandInk })
+      labels.place(`own-missile:${missile.id}`, 'Own missile', at.x + size + 6, at.y + size + 4, PLOT_COLOURS.command)
+      ownMissiles.push({ id: missile.id, at })
+    }
+
+    const hostileMissiles: DrawSummary['hostileMissiles'][number][] = []
+    for (const missile of scene.hostileMissiles) {
+      const at = toScreen(transform, missile.position)
+      const radiusPx = missile.uncertaintyRadiusUnits * transform.scale
+      if (missile.kind === 'stale' && radiusPx > 0) {
+        for (const [start, end] of dashCircle(radiusPx, 4, 5)) {
+          const mid = (start + end) / 2
+          if (!insideBounds(bounds, at.x + Math.cos(mid) * radiusPx, at.y + Math.sin(mid) * radiusPx)) continue
+          g.moveTo(at.x + Math.cos(start) * radiusPx, at.y + Math.sin(start) * radiusPx).arc(at.x, at.y, radiusPx, start, end)
+        }
+        g.stroke({ width: 1.25, color: PLOT_COLOURS.hostile, alpha: 0.7 })
+      }
+      // Hostile missile: a hollow triangle pointing up (no aim is known). Stale outline is dashed.
+      const outline = triangle(at, -Math.PI / 2)
+      const points = [{ x: outline[0], y: outline[1] }, { x: outline[2], y: outline[3] }, { x: outline[4], y: outline[5] }]
+      if (missile.kind === 'current') g.poly(outline, true).fill({ color: PLOT_COLOURS.hostile, alpha: 0.35 }).stroke({ width: 2, color: PLOT_COLOURS.hostile })
+      else {
+        for (const [a, b] of dashPolyline([...points, points[0]], 3, 3)) g.moveTo(a.x, a.y).lineTo(b.x, b.y)
+        g.stroke({ width: 2, color: PLOT_COLOURS.hostile })
+      }
+      const label = missile.kind === 'current' ? `${missile.alias} (hostile missile)` : `${missile.alias} (last seen, ${((missile.ageTicks * tickMs) / 1000).toFixed(1)} s ago)`
+      labels.place(`hostile-missile:${missile.alias}`, label, at.x + size + 6, at.y - size - 2, PLOT_COLOURS.hostile)
+      hostileMissiles.push({ alias: missile.alias, kind: missile.kind, at, radiusPx })
+    }
+
+    const effects: string[] = []
+    for (const effect of scene.effects) {
+      const alpha = Math.max(0.25, 1 - effect.ageTicks / EFFECT_TICKS)
+      if (effect.kind === 'beam') {
+        const from = toScreen(transform, effect.from)
+        const to = toScreen(transform, effect.to)
+        // Own beam: solid amber; hostile beam: coral with a centre line, so both read without colour.
+        g.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: effect.own ? 3 : 4, color: effect.own ? PLOT_COLOURS.command : PLOT_COLOURS.hostile, alpha })
+        if (!effect.own) g.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: 1, color: PLOT_COLOURS.well, alpha })
+        effects.push(effect.own ? 'own-beam' : 'hostile-beam')
+      } else if (effect.kind === 'impact') {
+        const at = toScreen(transform, effect.at)
+        const radius = Math.max(6, effect.radiusUnits * transform.scale)
+        g.circle(at.x, at.y, radius).stroke({ width: 2, color: PLOT_COLOURS.ink, alpha })
+        for (let k = 0; k < 8; k += 1) {
+          const angle = (k / 8) * Math.PI * 2
+          g.moveTo(at.x + Math.cos(angle) * radius * 0.4, at.y + Math.sin(angle) * radius * 0.4).lineTo(at.x + Math.cos(angle) * radius * 0.9, at.y + Math.sin(angle) * radius * 0.9)
+        }
+        g.stroke({ width: 1.5, color: PLOT_COLOURS.ink, alpha })
+        effects.push(`impact-${effect.weapon}`)
+      } else if (effect.kind === 'own-hit') {
+        const at = toScreen(transform, effect.at)
+        const radius = Math.max(16, transform.cellPx * 0.8)
+        for (const [start, end] of dashCircle(radius, 6, 4)) g.moveTo(at.x + Math.cos(start) * radius, at.y + Math.sin(start) * radius).arc(at.x, at.y, radius, start, end)
+        g.stroke({ width: 2.5, color: PLOT_COLOURS.ink, alpha })
+        labels.place('own-hit', 'Hit', at.x + radius + 4, at.y - radius, PLOT_COLOURS.ink)
+        effects.push('own-hit')
+      } else {
+        const at = toScreen(transform, effect.at)
+        g.circle(at.x, at.y, Math.max(6, size * 1.5)).stroke({ width: 1.5, color: effect.own ? PLOT_COLOURS.command : PLOT_COLOURS.hostile, alpha })
+        effects.push(effect.own ? 'own-launch' : 'hostile-launch')
+      }
+    }
+    return { ownMissiles, hostileMissiles, effects }
   }
 
   private drawContacts(contacts: readonly PlotContact[], transform: PlotTransform, labels: LabelPool, tickMs: number) {
@@ -512,6 +653,14 @@ export class BattlefieldRenderer {
     const g = this.layers.hover.clear()
     if (!this.transform || !this.hoverCell || !this.frame?.selectable) return
     const rect = cellRect(this.transform, this.hoverCell)
+    if (this.frame.pointerMode === 'aim') {
+      // Aiming: a ringed X like the aim mark, never the destination square.
+      const centre = { x: rect.x + rect.size / 2, y: rect.y + rect.size / 2 }
+      const r = rect.size * 0.32
+      g.circle(centre.x, centre.y, r).moveTo(centre.x - r, centre.y - r).lineTo(centre.x + r, centre.y + r)
+        .moveTo(centre.x + r, centre.y - r).lineTo(centre.x - r, centre.y + r).stroke({ width: 1.5, color: PLOT_COLOURS.ink, alpha: 0.9 })
+      return
+    }
     g.rect(rect.x + 1, rect.y + 1, rect.size - 2, rect.size - 2).stroke({ width: 1.5, color: PLOT_COLOURS.ink, alpha: 0.8 })
   }
 

@@ -27,7 +27,7 @@ export interface SystemOrdersProps {
 
 const SYSTEM_FIELDS = new Set<ValidationIssue['field']>(['sensor', 'cloak'])
 
-function Effects({ items, label }: { items: readonly Effect[]; label: string }) {
+export function Effects({ items, label }: { items: readonly Effect[]; label: string }) {
   return (
     <dl className="readouts system-effects" aria-label={label}>
       {items.map((item) => (
@@ -42,7 +42,7 @@ function Effects({ items, label }: { items: readonly Effect[]; label: string }) 
 
 interface Option<T> { readonly value: T; readonly label: string; readonly unavailable?: string | null }
 
-function Segmented<T extends string>({ legend, name, value, options, locked, describedBy, onSelect }: {
+export function Segmented<T extends string>({ legend, name, value, options, locked, describedBy, onSelect }: {
   legend: string; name: string; value: T; options: readonly Option<T>[]; locked: boolean; describedBy?: string; onSelect: (value: T) => void
 }) {
   return (

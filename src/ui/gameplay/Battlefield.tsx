@@ -20,6 +20,8 @@ export interface BattlefieldProps {
   readonly playback: BattlefieldPlayback | null
   /** True only while planning, when a click on the plot sets the draft destination. */
   readonly selectable: boolean
+  /** Deliberate aiming mode: clicks set the missile aim and the hover shows an aim mark. */
+  readonly pointerMode?: 'destination' | 'aim'
   readonly onSelectCell?: (cell: Cell) => void
   /** Pointer position for a text readout; called with null when the pointer leaves the map. */
   readonly onHoverCell?: (cell: Cell | null) => void
@@ -31,7 +33,7 @@ export interface BattlefieldProps {
  * React-managed host for the PixiJS plot. The renderer is created per encounter and
  * disposed on unmount or encounter change, including while its async init is pending.
  */
-export function Battlefield({ encounterId, map, rules, scene, playback, selectable, onSelectCell, onHoverCell, describedBy }: BattlefieldProps) {
+export function Battlefield({ encounterId, map, rules, scene, playback, selectable, pointerMode = 'destination', onSelectCell, onHoverCell, describedBy }: BattlefieldProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<BattlefieldRenderer | null>(null)
   const previousSceneRef = useRef<PlotScene | null>(null)
@@ -78,9 +80,9 @@ export function Battlefield({ encounterId, map, rules, scene, playback, selectab
       : scene.tick === previous.tick + 1 ? { from: previous, durationMs: rules.timing.tickMs / playback.speed }
         : scene.tick === previous.tick ? 'continue' as const
           : null
-    renderer.update({ map, unitsPerCell: rules.geometry.unitsPerCell, tickMs: rules.timing.tickMs, scene, smoothing, selectable })
+    renderer.update({ map, unitsPerCell: rules.geometry.unitsPerCell, tickMs: rules.timing.tickMs, scene, smoothing, selectable, pointerMode })
     previousSceneRef.current = scene
-  }, [ready, encounterId, map, rules, scene, playback, selectable, reducedMotion])
+  }, [ready, encounterId, map, rules, scene, playback, selectable, pointerMode, reducedMotion])
 
   return (
     <div className="battlefield">

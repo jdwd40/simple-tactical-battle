@@ -133,3 +133,6 @@
 .contact-select:hover { border-color: var(--color-seam); }
 .contact-select[aria-pressed="true"] { border-color: var(--color-ink-muted); box-shadow: inset 3px 0 0 var(--color-ink); }
 .contact-list { gap: 1rem; }
+
+.ordnance-title { margin-top: 1rem; }
+.ordnance-item { color: var(--color-ink-muted); }

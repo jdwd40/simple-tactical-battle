@@ -1,4 +1,4 @@
-import type { CloakObservation, OwnAssessment, PublicMap, Ruleset, Tick, VisibleEvent } from '../../contracts'
+import type { CloakObservation, Outcome, OwnAssessment, PublicMap, Ruleset, Tick, UnfiredReason, VisibleEvent } from '../../contracts'
 import { cellOfPosition } from '../../rendering/plotGeometry'
 
 export interface TextContext {
@@ -69,6 +69,22 @@ export function eventText(event: VisibleEvent, context: TextContext): string {
   }
 }
 
+const UNFIRED: Record<UnfiredReason, string> = {
+  'no-current-lock': 'the target was never detected as current',
+  'out-of-range': 'the target stayed out of range',
+  'line-of-sight-blocked': 'an asteroid blocked the line of sight',
+  cooldown: 'the weapon was still cooling down',
+  'insufficient-energy': 'there was not enough energy',
+  'own-destroyed': 'your ship was destroyed first',
+}
+
+/** Title and one-sentence result of a revealed combat outcome, for the ending panel. */
+export const OUTCOME_TEXT: Record<Outcome, { readonly title: string; readonly line: string }> = {
+  victory: { title: 'Victory', line: 'The patrol frigate is destroyed and Shadow-Dancer survives.' },
+  defeat: { title: 'Defeat', line: 'Shadow-Dancer is destroyed; the patrol frigate survives.' },
+  'mutual-destruction': { title: 'Mutual destruction', line: 'Both ships are destroyed.' },
+}
+
 /** Concise own-ship consequences of the assessed turn, for the assessment panel. */
 export function assessmentLines(assessment: OwnAssessment, context: TextContext, turnStartTick = assessment.revealTick - context.rules.timing.turnTicks): string[] {
   const lines: string[] = []
@@ -100,6 +116,19 @@ export function assessmentLines(assessment: OwnAssessment, context: TextContext,
     lines.push(sensor.reason === 'insufficient-energy'
       ? 'Active pulse failed on the first tick for lack of energy. It did not retry and did not expose you.'
       : 'Active pulse not made: your ship was destroyed.')
+  }
+  const weapon = assessment.weaponAttempt
+  const weaponName = (kind: 'laser' | 'missile') => (kind === 'laser' ? 'Laser' : 'Missile')
+  if (weapon.kind === 'fired') lines.push(`${weaponName(weapon.weapon)} fired at ${seconds(weapon.tick - turnStartTick)}.`)
+  else if (weapon.kind === 'unfired') {
+    const reasons = weapon.reasons.map((reason) => UNFIRED[reason])
+    lines.push(`${weaponName(weapon.weapon)} did not fire: ${reasons.length > 0 ? reasons.join('; ') : 'it never became eligible'}. The intent does not carry into the next turn.`)
+  }
+  if (assessment.ordnancePending?.reason === 'known-own-missiles') {
+    const count = assessment.ordnancePending.missileIds.length
+    lines.push(`Your ${count === 1 ? 'missile is' : `${count} missiles are`} still flying, so the encounter continues.`)
+  } else if (assessment.ordnancePending?.reason === 'observed-opponent-destroyed') {
+    lines.push('You saw the patrol frigate destroyed, but ordnance is still active: weapons now hold fire.')
   }
   const latched = assessment.events.filter((event) => event.kind === 'own-cloak').map((event) => event.cloak.state)
   if (latched.includes('latched-activity')) lines.push('Your scan or shot broke cloak for the rest of the turn. Request it again when planning.')

@@ -249,7 +249,7 @@ test('a keyboard-only turn: grid entry, commit, skip, assess and plan the next',
   await page.keyboard.type('9')
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('movement-order')).toHaveText('Column 10, row 9')
-  for (const name of ['Set destination', 'Hold position', 'Passive', 'On', 'Commit turn 1']) {
+  for (const name of ['Set destination', 'Hold position', 'Passive', 'On', 'Hold fire', 'Commit turn 1']) {
     await page.keyboard.press('Tab')
     await expect(page.locator(':focus')).toHaveAccessibleName(name)
   }

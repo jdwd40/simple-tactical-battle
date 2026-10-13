@@ -1,13 +1,14 @@
 import type { Scenario, SimulationState, TurnPresentation } from '../contracts/private'
 import type {
   CommitResult, GameController, GameView, OrderValidation, OwnRoutePreview, PlanOpponent, PlaybackCommand,
-  PreviewRoute, PublicReplayFrame, ReplayPrefix, RestartCommand, Ruleset, SideObservation, Tick, TurnOrders,
+  PreviewRoute, PublicReplayFrame, ReplayPrefix, RestartCommand, RevealedOutcome, Ruleset, SideObservation, Tick, TurnOrders,
   ValidateOrders, VisibleEvent,
 } from '../contracts/public'
 import type { InitialiseSession, ResolveTurn } from '../contracts/private'
 import { freezeData } from '../scenarios/freeze'
 import { DUEL_SCENARIO } from '../scenarios/private'
 import { DUEL_RULES } from '../scenarios/public'
+import { aftermathWindowBound } from '../scenarios/rules'
 import { ENGINE_CAPABILITIES, initialiseSession, observeSide, previewRoute, resolveTurn, validateOrders } from '../simulation'
 import { browserClock, type PresentationClock } from './presentationClock'
 import { scriptedPatrol } from './scriptedPatrol'
@@ -60,14 +61,18 @@ interface Planning {
   readonly draft: TurnOrders
   readonly validation: OrderValidation
   readonly preview: OwnRoutePreview
-  /** Opponent plan made once at planning entry; editing the draft never re-plans it. */
-  readonly opponent: ReturnType<PlanOpponent>
+  /** Opponent plan made once at planning entry; editing the draft never re-plans it. Null for a destroyed opponent. */
+  readonly opponent: ReturnType<PlanOpponent> | null
 }
 
 interface ResolvedTurn {
+  /** The player's committed orders for the latest player turn. */
   readonly locked: TurnOrders
-  readonly presentation: TurnPresentation
+  /** That turn's presentation, then each automatic window, appended only as it begins. */
+  readonly windows: TurnPresentation[]
 }
+
+type Ending = { readonly kind: 'abandoned' } | { readonly kind: 'combat' }
 
 interface Encounter {
   readonly id: string
@@ -77,9 +82,32 @@ interface Encounter {
   planning: Planning | null
   turn: ResolvedTurn | null
   cursor: Tick
-  replayOf: null | 'assessment'
+  replayOf: null | 'assessment' | 'terminal'
   /** Last frame published to the player; abandon freezes on it rather than revealing more. */
   lastFrame: PublicReplayFrame | null
+  /** Recorded combat ending, held privately until the cursor reaches its reveal tick. */
+  outcome: RevealedOutcome | null
+  /** Automatic windows begun after own destruction, against the approved aftermath bound. */
+  aftermath: { count: number; readonly bound: number } | null
+  ending: Ending | null
+}
+
+const holdOrders = (turnIndex: number): TurnOrders => ({ turnIndex, movement: { kind: 'hold' }, sensor: 'passive', cloak: false, weapon: { kind: 'hold' } })
+const lastWindow = (turn: ResolvedTurn) => turn.windows[turn.windows.length - 1]
+const startTickOf = (turn: ResolvedTurn) => turn.windows[0].startTick
+const endTickOf = (turn: ResolvedTurn) => lastWindow(turn).endTick
+
+/** The latest player turn and its attached automatic windows as one frame sequence through the cursor. */
+function framesThrough(turn: ResolvedTurn, cursor: Tick): PublicReplayFrame[] {
+  const frames: PublicReplayFrame[] = []
+  for (const [index, window] of turn.windows.entries()) {
+    // A window's starting frame repeats the previous window's recorded final tick.
+    for (const frame of index === 0 ? window.frames : window.frames.slice(1)) {
+      if (frame.tick > cursor) return frames
+      frames.push(frame)
+    }
+  }
+  return frames
 }
 
 /** Subtrees already frozen all the way down, so recorded frames are walked only once. */
@@ -121,16 +149,10 @@ export function createGameController(options: GameControllerOptions): Applicatio
       cloak: own.cloak.actual,
       weapon: { kind: 'hold' },
     })
-    const patrolObservation = engine.observeSide(target.state, 'patrol', rules, scenario)
-    const planned = planOpponent(patrolObservation, target.state.plannerMemory.patrol, target.state.random.planners.patrol)
-    const opponentValid = engine.validateOrders(planned.orders, patrolObservation, rules).structurallyValid
-    const opponent = opponentValid ? planned : {
-      ...planned,
-      orders: { turnIndex: patrolObservation.turnIndex, movement: { kind: 'hold' }, sensor: 'passive', cloak: false, weapon: { kind: 'hold' } } as const,
-    }
+    const opponent = planPatrol(target.state)
     const frame: PublicReplayFrame = freezeData({ tick: observation.tick, observation, events: [] })
     target.planning = {
-      observation, frame, draft, opponent: freezeData(opponent),
+      observation, frame, draft, opponent: opponent && freezeData(opponent),
       validation: engine.validateOrders(draft, observation, rules),
       preview: engine.previewRoute(draft.movement, own, observation.map, rules),
     }
@@ -141,20 +163,38 @@ export function createGameController(options: GameControllerOptions): Applicatio
     target.phase = 'planning'
   }
 
+  /** The living opponent plans from its own observation, memory and stream only; a destroyed one is never asked. */
+  function planPatrol(state: SimulationState): ReturnType<PlanOpponent> | null {
+    if (!state.ships.patrol.alive) return null
+    const observation = engine.observeSide(state, 'patrol', rules, scenario)
+    const planned = planOpponent(observation, state.plannerMemory.patrol, state.random.planners.patrol)
+    return engine.validateOrders(planned.orders, observation, rules).structurallyValid ? planned : { ...planned, orders: holdOrders(observation.turnIndex) }
+  }
+
+  /** The state handed to resolution, carrying the opponent's updated planner memory and stream. */
+  function withOpponentPlan(state: SimulationState, opponent: ReturnType<PlanOpponent> | null): SimulationState {
+    if (!opponent) return state
+    return freezeData({
+      ...state,
+      plannerMemory: { ...state.plannerMemory, patrol: opponent.memory },
+      random: { ...state.random, planners: { ...state.random.planners, patrol: opponent.plannerRandomState } },
+    })
+  }
+
   function newEncounter(): Encounter {
     encounterCount += 1
     const created: Encounter = {
       id: `encounter-${encounterCount}`, seed,
       state: engine.initialiseSession(scenario, rules, seed),
       phase: 'planning', planning: null, turn: null, cursor: 0, replayOf: null, lastFrame: null,
+      outcome: null, aftermath: null, ending: null,
     }
     enterPlanning(created)
     return created
   }
 
   function prefix(turn: ResolvedTurn, cursor: Tick): ReplayPrefix {
-    const { presentation } = turn
-    const frames = presentation.frames.slice(0, cursor - presentation.startTick + 1)
+    const frames = framesThrough(turn, cursor)
     const seen = new Set<string>()
     const events: VisibleEvent[] = []
     for (const frame of frames) {
@@ -167,8 +207,9 @@ export function createGameController(options: GameControllerOptions): Applicatio
     events.sort((a, b) => a.tick - b.tick || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     return {
       scope: 'latest-player-turn-with-aftermath',
-      startTick: presentation.startTick,
-      endTick: presentation.endTick,
+      startTick: startTickOf(turn),
+      // Only windows already begun: the horizon extends as each automatic window starts.
+      endTick: endTickOf(turn),
       cursorTick: cursor,
       frames,
       events,
@@ -186,14 +227,27 @@ export function createGameController(options: GameControllerOptions): Applicatio
         return { ...base, phase: 'commit', frame: planning!.frame, lockedOwnOrders: planning!.draft, replay: null }
       case 'execution': {
         const replay = prefix(turn!, encounter.cursor)
-        return { ...base, phase: 'execution', frame: replay.frames[replay.frames.length - 1], replay, replayOf: encounter.replayOf, automatic: false, lockedOwnOrders: turn!.locked }
+        const frame = replay.frames[replay.frames.length - 1]
+        const common = { ...base, phase: 'execution' as const, frame, replay, replayOf: encounter.replayOf }
+        // Past the player's committed turn, only automatic windows after own destruction remain.
+        return encounter.cursor > turn!.windows[0].endTick
+          ? { ...common, automatic: true, reason: 'own-destroyed', lockedOwnOrders: null }
+          : { ...common, automatic: false, lockedOwnOrders: turn!.locked }
       }
       case 'assessment': {
-        const replay = prefix(turn!, turn!.presentation.endTick)
-        return { ...base, phase: 'assessment', frame: replay.frames[replay.frames.length - 1], lockedOwnOrders: turn!.locked, replay, assessment: turn!.presentation.assessment }
+        const replay = prefix(turn!, endTickOf(turn!))
+        return { ...base, phase: 'assessment', frame: replay.frames[replay.frames.length - 1], lockedOwnOrders: turn!.locked, replay, assessment: lastWindow(turn!).assessment }
       }
-      case 'terminal':
+      case 'terminal': {
+        if (encounter.ending?.kind === 'combat') {
+          const replay = prefix(turn!, endTickOf(turn!))
+          return {
+            ...base, phase: 'terminal', frame: replay.frames[replay.frames.length - 1], lockedOwnOrders: turn!.locked, replay,
+            result: { kind: 'combat', outcome: encounter.outcome!, assessment: lastWindow(turn!).assessment },
+          }
+        }
         return { ...base, phase: 'terminal', frame: encounter.lastFrame!, lockedOwnOrders: null, replay: null, result: { kind: 'abandoned' } }
+      }
     }
   }
 
@@ -225,20 +279,62 @@ export function createGameController(options: GameControllerOptions): Applicatio
     })
   }
 
-  /** Moves the presentation cursor; reaching the end reveals the assessment. */
+  /**
+   * Moves the presentation cursor. Reaching the end reveals what the recording holds for that
+   * tick: the outcome at its reveal tick, the next automatic window after own destruction, or
+   * the assessment. Nothing is revealed or resolved earlier.
+   */
   function moveCursor(tick: Tick) {
-    const { startTick, endTick } = encounter.turn!.presentation
-    encounter.cursor = Math.min(endTick, Math.max(startTick, Math.trunc(tick)))
+    const turn = encounter.turn!
+    const endTick = endTickOf(turn)
+    encounter.cursor = Math.min(endTick, Math.max(startTickOf(turn), Math.trunc(tick)))
     if (encounter.cursor >= endTick) {
-      encounter.phase = 'assessment'
-      encounter.replayOf = null
-      playing = false
-      stopTimer()
-    } else if (encounter.phase === 'assessment') {
+      if (encounter.outcome && encounter.outcome.revealTick <= encounter.cursor) {
+        encounter.phase = 'terminal'
+        encounter.ending = { kind: 'combat' }
+        encounter.replayOf = null
+        playing = false
+        stopTimer()
+      } else if (!encounter.state.ships.player.alive) {
+        beginAutomaticWindow(encounter)
+      } else {
+        encounter.phase = 'assessment'
+        encounter.replayOf = null
+        playing = false
+        stopTimer()
+      }
+    } else if (encounter.phase === 'assessment' || encounter.phase === 'terminal') {
+      encounter.replayOf = encounter.phase
       encounter.phase = 'execution'
-      encounter.replayOf = 'assessment'
     }
     publish()
+  }
+
+  /**
+   * After own destruction, resolves the next bounded automatic WEGO window exactly once, when it
+   * begins. The living opponent plans from its own observation only; a destroyed one is not asked.
+   */
+  function beginAutomaticWindow(owner: Encounter) {
+    const state = owner.state
+    const survivorAmmunition = (['player', 'patrol'] as const).reduce((sum, side) => sum + (state.ships[side].alive ? state.ships[side].ammunition : 0), 0)
+    owner.aftermath ??= { count: 0, bound: aftermathWindowBound(rules, survivorAmmunition) }
+    if (owner.aftermath.count >= owner.aftermath.bound) {
+      // Internal invariant failure: stop rather than invent a draw.
+      playing = false
+      stopTimer()
+      console.error(`Automatic aftermath exceeded its bound of ${owner.aftermath.bound} windows without an outcome`)
+      return
+    }
+    const opponent = planPatrol(state)
+    const resolution = engine.resolveTurn(withOpponentPlan(state, opponent), {
+      turnIndex: state.turnIndex, startTick: state.tick, automatic: true,
+      orders: { player: null, patrol: opponent?.orders ?? null },
+    }, rules, scenario)
+    owner.aftermath.count += 1
+    owner.state = resolution.nextState
+    owner.outcome = resolution.nextState.outcome
+    owner.turn!.windows.push(resolution.presentations.player)
+    owner.phase = 'execution'
   }
 
   function startEncounter() {
@@ -287,14 +383,9 @@ export function createGameController(options: GameControllerOptions): Applicatio
       // Both envelopes are already frozen; resolve exactly once, privately, before publishing.
       const owner = encounter
       const state = owner.state
-      const prepared: SimulationState = freezeData({
-        ...state,
-        plannerMemory: { ...state.plannerMemory, patrol: planning.opponent.memory },
-        random: { ...state.random, planners: { ...state.random.planners, patrol: planning.opponent.plannerRandomState } },
-      })
-      const resolution = engine.resolveTurn(prepared, {
+      const resolution = engine.resolveTurn(withOpponentPlan(state, planning.opponent), {
         turnIndex: state.turnIndex, startTick: state.tick, automatic: false,
-        orders: { player: planning.draft, patrol: planning.opponent.orders },
+        orders: { player: planning.draft, patrol: planning.opponent?.orders ?? null },
       }, rules, scenario)
 
       owner.phase = 'commit'
@@ -303,7 +394,9 @@ export function createGameController(options: GameControllerOptions): Applicatio
       if (encounter !== owner || owner.phase !== 'commit') return { kind: 'ignored', reason: 'wrong-phase' }
 
       owner.state = resolution.nextState
-      owner.turn = { locked: planning.draft, presentation: resolution.presentations.player }
+      owner.turn = { locked: planning.draft, windows: [resolution.presentations.player] }
+      owner.outcome = resolution.nextState.outcome
+      owner.aftermath = null
       owner.planning = null
       owner.phase = 'execution'
       owner.replayOf = null
@@ -315,14 +408,15 @@ export function createGameController(options: GameControllerOptions): Applicatio
     },
 
     playback(command: PlaybackCommand) {
-      if (!encounter.turn || (encounter.phase !== 'execution' && encounter.phase !== 'assessment')) return
-      const { startTick, endTick } = encounter.turn.presentation
+      const replayable = encounter.phase === 'execution' || encounter.phase === 'assessment' || (encounter.phase === 'terminal' && encounter.ending?.kind === 'combat')
+      if (!encounter.turn || !replayable) return
+      const turn = encounter.turn
       switch (command.kind) {
         case 'play':
-          if (encounter.phase === 'assessment') {
-            // Replay from the start of the assessed turn.
+          if (encounter.phase === 'assessment' || encounter.phase === 'terminal') {
+            // Replay the recorded turn (and any aftermath) from its start; nothing resolves again.
             playing = true
-            moveCursor(startTick)
+            moveCursor(startTickOf(turn))
           } else {
             playing = true
             publish()
@@ -346,9 +440,15 @@ export function createGameController(options: GameControllerOptions): Applicatio
           playing = false
           moveCursor(encounter.cursor + (command.direction === -1 ? -1 : 1))
           break
-        case 'skipToEnd':
-          moveCursor(endTick)
+        case 'skipToEnd': {
+          // Through every window as it begins, to the assessment or the revealed ending.
+          let end: Tick
+          do {
+            end = endTickOf(turn)
+            moveCursor(end)
+          } while (encounter.turn === turn && encounter.phase === 'execution' && endTickOf(turn) > end)
           break
+        }
       }
       scheduleTick()
     },
@@ -363,10 +463,12 @@ export function createGameController(options: GameControllerOptions): Applicatio
     },
 
     abandon() {
-      if (encounter.phase === 'terminal') return
+      // A recorded combat ending stays final, including while its replay plays.
+      if (encounter.phase === 'terminal' || encounter.ending) return
       stopTimer()
       playing = false
       encounter.phase = 'terminal'
+      encounter.ending = { kind: 'abandoned' }
       encounter.planning = null
       encounter.turn = null
       publish()

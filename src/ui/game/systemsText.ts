@@ -1,9 +1,11 @@
-import type { CloakObservation, OwnShipObservation, Ruleset, SensorOrder, Tick, TurnOrders } from '../../contracts'
+import type { CloakObservation, ContactMemory, OwnShipObservation, Ruleset, SensorOrder, Tick, TurnOrders, VisibleEvent } from '../../contracts'
 import { energyText } from './consoleText'
 
 /** What the console may offer, handed in by the composition root from the engine facade. */
 export interface OrderCapabilities {
   readonly activePulse: boolean
+  readonly laser: boolean
+  readonly missile: boolean
 }
 
 export const secondsText = (ticks: number, rules: Ruleset) => `${((Math.max(0, ticks) * rules.timing.tickMs) / 1000).toFixed(1)} s`
@@ -131,6 +133,11 @@ export function energyPlan(orders: TurnOrders, own: OwnShipObservation, moving: 
     upkeep += rules.sensors.pulseCostMilli
     parts.push(`pulse ${energyText(rules.sensors.pulseCostMilli)}`)
   }
+  if (orders.weapon.kind !== 'hold') {
+    const cost = orders.weapon.kind === 'laser' ? rules.laser.costMilli : rules.missile.costMilli
+    upkeep += cost
+    parts.push(`${orders.weapon.kind} ${energyText(cost)}`)
+  }
   if (moving) {
     upkeep += spec.propulsionMilliPerTick * ticks
     parts.push(`propulsion ${energyText(spec.propulsionMilliPerTick * ticks)}`)
@@ -140,4 +147,50 @@ export function energyPlan(orders: TurnOrders, own: OwnShipObservation, moving: 
     currentMilli: own.energy.currentMilli, maxMilli: own.energy.maxMilli, rechargeMilli: recharge,
     upkeepMilli: upkeep, parts, mayRunShort: upkeep > own.energy.currentMilli + recharge,
   }
+}
+
+/** Readiness of a weapon clock at the shown frame. */
+export function readinessText(readyTick: Tick, tick: Tick, rules: Ruleset): string {
+  return readyTick > tick ? `Cooling, ${secondsText(readyTick - tick, rules)}` : 'Ready'
+}
+
+/** Public-rule weapon figures shown before committing an intent. */
+export function weaponEffects(kind: 'laser' | 'missile', own: OwnShipObservation, tick: Tick, rules: Ruleset): Effect[] {
+  if (kind === 'laser') {
+    return [
+      { label: 'Cost', value: `${energyText(rules.laser.costMilli)} energy when it fires` },
+      { label: 'Damage', value: `${rules.laser.damage}, shields first` },
+      { label: 'Range', value: `${cellsText(rules.laser.rangeUnits, rules)}, clear line of sight` },
+      { label: 'Needs', value: 'A current lock at the firing tick' },
+      { label: 'Cooldown', value: `${secondsText(rules.timing.laserCooldownTicks, rules)}; ${readinessText(own.clocks.laserReadyTick, tick, rules).toLowerCase()}` },
+    ]
+  }
+  const lifetime = rules.timing.missileLifetimeTicks
+  return [
+    { label: 'Cost', value: `${energyText(rules.missile.costMilli)} energy and 1 missile (${own.ammunition.current} left)` },
+    { label: 'Damage', value: `${rules.missile.damage}, blast radius ${rules.missile.blastRadiusUnits / rules.geometry.unitsPerCell} cell` },
+    { label: 'Flight', value: `${(rules.missile.speedUnitsPerSecond / rules.geometry.unitsPerCell).toFixed(1)} cells/s for ${secondsText(lifetime, rules)}, no homing` },
+    { label: 'Cooldown', value: `${secondsText(rules.timing.missileCooldownTicks, rules)}; ${readinessText(own.clocks.missileReadyTick, tick, rules).toLowerCase()}` },
+  ]
+}
+
+/** How a laser target is labelled: a current lock, or a last sighting that must be reacquired. */
+export function targetText(contact: ContactMemory, rules: Ruleset): string {
+  return contact.kind === 'current'
+    ? `${contact.alias}, current`
+    : `${contact.alias}, last known ${secondsText(contact.ageTicks, rules)} ago: fires only if detected again`
+}
+
+/**
+ * Outcome of the committed weapon intent so far, from the own observation and the events
+ * through the shown frame. Turn flags describe the previous turn until a tick has resolved.
+ */
+export function weaponProgressText(orders: TurnOrders, own: OwnShipObservation, events: readonly VisibleEvent[], turnStartTick: Tick, ticksResolved: number, rules: Ruleset): string | null {
+  const weapon = orders.weapon
+  if (weapon.kind === 'hold') return null
+  const shot = events.find((event): event is Extract<VisibleEvent, { kind: 'own-shot' }> => event.kind === 'own-shot' && event.tick > turnStartTick)
+  if (shot) return `${weapon.kind === 'laser' ? 'Laser' : 'Missile'} fired at ${secondsText(shot.tick - turnStartTick, rules)}.`
+  if (ticksResolved < 1) return `The ${weapon.kind} fires at its first eligible tick this turn.`
+  if (own.status === 'destroyed') return `The ${weapon.kind} did not fire before your ship was destroyed.`
+  return `Waiting for the ${weapon.kind} to become eligible; the reason shows at assessment if it never fires.`
 }

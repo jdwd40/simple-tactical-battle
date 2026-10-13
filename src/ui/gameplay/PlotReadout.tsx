@@ -30,13 +30,14 @@ export function PlotReadout({ id, scene, map, rules, pointerCell = null, onSelec
   }
   const pointerContacts = pointerCell ? scene.contacts.filter((contact) => sameCell(contact, pointerCell)) : []
   /** Range and bearing from own ship to the measured (current) or last-known position. */
-  const rangeBearing = (contact: PlotContact) => {
-    const dx = contact.position.x - own.position.x
-    const dy = contact.position.y - own.position.y
+  const rangeOf = (position: { x: number; y: number }) => {
+    const dx = position.x - own.position.x
+    const dy = position.y - own.position.y
     const heading = velocityHeading(dx, dy)
     if (heading === null) return 'at your position'
     return `${(Math.hypot(dx, dy) / units).toFixed(1)} cells away on bearing ${String(Math.round(heading / 1000) % 360).padStart(3, '0')}°`
   }
+  const rangeBearing = (contact: PlotContact) => rangeOf(contact.position)
 
   return (
     <div id={id} className="plot-readout">
@@ -52,6 +53,16 @@ export function PlotReadout({ id, scene, map, rules, pointerCell = null, onSelec
             ? 'Holding'
             : `To column ${plan.destination.column}, row ${plan.destination.row}${plan.kind === 'preview' ? ' (draft)' : ''}`}
         </dd>
+        {scene.weaponPlan && (
+          <>
+            <dt>Weapon</dt>
+            <dd>
+              {scene.weaponPlan.kind === 'laser'
+                ? `Laser at ${scene.weaponPlan.alias}${scene.weaponPlan.current ? '' : ' (needs a new lock)'}`
+                : `Missile at column ${scene.weaponPlan.aim.column}, row ${scene.weaponPlan.aim.row}`}
+            </dd>
+          </>
+        )}
         {reach && (
           <>
             <dt>Sensor reach</dt>
@@ -119,6 +130,25 @@ export function PlotReadout({ id, scene, map, rules, pointerCell = null, onSelec
             )
           })}
         </ul>
+      )}
+      {(scene.ownMissiles.length > 0 || scene.hostileMissiles.length > 0) && (
+        <>
+          <h3 className="readout-subtitle ordnance-title">Ordnance</h3>
+          <ul className="contact-list" aria-label="Known ordnance">
+            {scene.ownMissiles.map((missile) => (
+              <li key={missile.id} className="ordnance-item" data-kind="own">
+                Own missile at {cellText(missile.position)}, aimed at column {missile.aim.column}, row {missile.aim.row}.
+              </li>
+            ))}
+            {scene.hostileMissiles.map((missile) => (
+              <li key={missile.alias} className="ordnance-item" data-kind={missile.kind} data-alias={missile.alias}>
+                {missile.kind === 'current'
+                  ? `Hostile ${missile.alias} at ${cellText(missile.position)}, ${rangeOf(missile.position)}.`
+                  : `Hostile ${missile.alias} last seen ${((missile.ageTicks * tickMs) / 1000).toFixed(1)} s ago at ${cellText(missile.position)}; now anywhere within ${(missile.uncertaintyRadiusUnits / units).toFixed(1)} cells. Its aim is unknown.`}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   )
