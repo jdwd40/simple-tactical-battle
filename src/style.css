@@ -157,15 +157,16 @@ button { font: inherit; color: inherit; }
 /* ---------- action bar ---------- */
 .actions {
   display: grid;
-  grid-template-columns: repeat(4, 1fr) 1.35fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   padding: 6px 10px 10px;
 }
+.action.end { grid-column: span 2; }
 .action {
   position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  min-height: 60px;
-  padding: 6px 2px;
+  min-height: 54px;
+  padding: 5px 2px;
   border-radius: 14px;
   border: 1px solid var(--panel-border);
   background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
@@ -192,6 +193,8 @@ button { font: inherit; color: inherit; }
 .action.end .cost { color: rgba(11,17,32,0.7); }
 .action.end.pulse { animation: endpulse 1.2s ease-in-out infinite; }
 @keyframes endpulse { 50% { box-shadow: 0 6px 30px rgba(92,242,154,0.7); transform: translateY(-1px); } }
+.action .badge.cool { background: #3a4a6a; box-shadow: none; }
+.action .badge.hidden { display: none; }
 .action .badge {
   position: absolute; top: 4px; right: 6px;
   min-width: 18px; height: 18px; padding: 0 5px;
@@ -298,7 +301,7 @@ button { font: inherit; color: inherit; }
   .topbar .score { font-size: 15px; }
   .status { padding: 0 10px 4px; gap: 6px; }
   .bar .track { height: 6px; }
-  .action { min-height: 52px; }
+  .action { min-height: 44px; gap: 1px; }
   .action svg { width: 18px; height: 18px; }
   .action .cost { display: none; }
   .hint { margin: 4px 0 0; min-height: 24px; font-size: 11px; padding: 3px 10px; }
@@ -318,8 +321,8 @@ button { font: inherit; color: inherit; }
   .side { grid-area: side; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
   .status { grid-template-columns: 1fr 1fr; padding: 12px; border-radius: 18px; background: var(--panel); border: 1px solid var(--panel-border); }
   .status .counter { flex-direction: row; justify-content: space-between; }
-  .actions { grid-template-columns: 1fr 1fr; padding: 0; }
-  .action.end { grid-column: span 2; }
+  .actions { grid-template-columns: 1fr 1fr 1fr; padding: 0; }
+  .action.end { grid-column: span 3; }
 }
 
 @media (prefers-reduced-motion: reduce) {

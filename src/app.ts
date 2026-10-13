@@ -3,14 +3,15 @@ import { Renderer } from './render/renderer';
 import { Sfx } from './audio/sfx';
 import { shipColor } from './render/ships';
 import {
-  canBoost, createGame, endPlayerTurn, laserTargets, missileTargets, moveTargets, playerBoost, playerLaser,
-  playerMissile, playerMove, runEnemyTurn, shipAt, startWave, threatCells,
+  canBoost, canFlak, canRail, createGame, endPlayerTurn, flakTargets, laserTargets, missileTargets, moveTargets, playerBoost,
+  playerFlak, playerLaser, playerMissile, playerMove, playerRail, railDirectionFor, railLine, railTargets, runEnemyTurn, startWave, threatCells,
 } from './game/state';
 import { ENEMIES, PICKUPS, PLAYER } from './game/rules';
 import { key, same } from './game/grid';
 import type { ActionMode, DamageResult, EnemyKind, GameEvent, GameState, Vec } from './game/types';
 
 const BEST_KEY = 'stb.best';
+const NONE = { move: false, laser: false, missile: false, rail: false, flak: false, boost: false };
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 export class App {
@@ -59,6 +60,9 @@ export class App {
       laserTarget: () => laserTargets(s())[0]?.pos ?? null,
       missileTarget: () => nearest(missileTargets(s())),
       moveTarget: () => nearest(moveTargets(s())),
+      railTarget: () => s().enemies.map((e) => e.pos).find((p) => railDirectionFor(s(), p)) ?? null,
+      railLine: (d: Vec) => railLine(s(), d),
+      canFlak: () => canFlak(s()),
       info: () => ({ wave: s().wave, phase: s().phase, hull: s().player.hull, shield: s().player.shield, energy: s().energy, score: s().score, enemies: s().enemies.length }),
     };
   }
@@ -68,12 +72,12 @@ export class App {
   private showTitle(): void {
     const overlay = this.hud.overlay(`
       <h1>Simple Tactical Battle</h1>
-      <p>Outfight the Federation patrol, one wave at a time.</p>
+      <p>Command the battlecruiser Shadow-Dancer against the Federation fleet.</p>
       <ul class="howto">
-        <li><span class="dot" style="color:#40e0ff"></span><span>You get <b>2 actions</b> per turn. Tap a glowing cell to move.</span></li>
-        <li><span class="dot" style="color:#ff4fa3"></span><span>Lasers need a clear line of sight and cost energy.</span></li>
-        <li><span class="dot" style="color:#ffc64a"></span><span>Missiles arc over asteroids and splash a 3×3 area.</span></li>
-        <li><span class="dot" style="color:#5cf29a"></span><span>Grab pickups, chain kills for combo points, survive.</span></li>
+        <li><span class="dot" style="color:#40e0ff"></span><span>Your battlecruiser gets <b>3 actions</b> per turn. Tap a glowing cell to move.</span></li>
+        <li><span class="dot" style="color:#ff4fa3"></span><span><b>Laser</b> needs line of sight. <b>Railgun</b> pierces a whole line, then cools down.</span></li>
+        <li><span class="dot" style="color:#ffc64a"></span><span><b>Flak</b> shreds every fighter nearby. <b>Missiles</b> arc over rocks and splash 3×3.</span></li>
+        <li><span class="dot" style="color:#5cf29a"></span><span>Grab pickups, chain kills for combos, survive the Warlord every 5th wave.</span></li>
       </ul>
       ${this.best ? `<p class="best">Best score ${this.best.toLocaleString()}</p>` : ''}
       <button class="btn">Launch</button>
@@ -134,7 +138,7 @@ export class App {
   // ---------- input ----------
 
   private onKey(e: KeyboardEvent): void {
-    const map: Record<string, ActionMode | 'end'> = { '1': 'move', '2': 'laser', '3': 'missile', '4': 'boost', Enter: 'end', ' ': 'end' };
+    const map: Record<string, ActionMode | 'end'> = { '1': 'laser', '2': 'rail', '3': 'flak', '4': 'missile', '5': 'move', '6': 'boost', Enter: 'end', ' ': 'end' };
     const m = map[e.key];
     if (m) { e.preventDefault(); this.onAction(m); }
     if (e.key === 'Escape') { this.mode = null; this.refresh(); }
@@ -147,6 +151,12 @@ export class App {
       if (!canBoost(this.state)) return;
       this.mode = null;
       void this.act(playerBoost(this.state));
+      return;
+    }
+    if (mode === 'flak') {
+      if (!canFlak(this.state)) return;
+      this.mode = null;
+      void this.act(playerFlak(this.state));
       return;
     }
     this.mode = this.mode === mode ? null : mode;
@@ -165,6 +175,9 @@ export class App {
     if (mode === 'missile') {
       if (missileTargets(s).some((p) => same(p, cell))) { void this.act(playerMissile(s, cell)); return; }
     }
+    if (mode === 'rail') {
+      if (canRail(s) && railDirectionFor(s, cell)) { void this.act(playerRail(s, cell)); return; }
+    }
     if (mode === 'move' || mode === null) {
       if (moveTargets(s).some((p) => same(p, cell))) { void this.act(playerMove(s, cell)); return; }
     }
@@ -176,7 +189,7 @@ export class App {
       return;
     }
     if (same(cell, s.player.pos)) {
-      this.hud.hint(`Shadow-Dancer: laser ${PLAYER.laser.damage} dmg · missile ${PLAYER.missile.damage} dmg · move ${PLAYER.moveRange}`);
+      this.hud.hint(`Shadow-Dancer: laser ${PLAYER.laser.damage} · rail ${PLAYER.rail.damage} · flak ${PLAYER.flak.damage}×all · missile ${PLAYER.missile.damage}`);
       return;
     }
     this.sfx.play('click');
@@ -226,6 +239,8 @@ export class App {
     if (mode === 'move') return moveTargets(s).length > 0;
     if (mode === 'laser') return laserTargets(s).length > 0;
     if (mode === 'missile') return missileTargets(s).length > 0;
+    if (mode === 'rail') return railTargets(s).length > 0;
+    if (mode === 'flak') return canFlak(s);
     return canBoost(s);
   }
 
@@ -240,6 +255,8 @@ export class App {
       move: moveTargets(s).length > 0,
       laser: laserTargets(s).length > 0,
       missile: missileTargets(s).length > 0,
+      rail: railTargets(s).length > 0,
+      flak: canFlak(s),
       boost: canBoost(s),
     };
     let hint = '';
@@ -248,11 +265,17 @@ export class App {
       if (this.mode === 'move') { for (const p of moveTargets(s)) r.highlights.set(key(p), 'move'); hint = 'Tap a cell to move. Red cells are in enemy reach.'; }
       else if (this.mode === 'laser') { for (const e of laserTargets(s)) r.highlights.set(key(e.pos), 'laser'); hint = 'Tap a target to fire the laser.'; }
       else if (this.mode === 'missile') { for (const p of missileTargets(s)) r.highlights.set(key(p), 'missile'); hint = 'Tap where the missile should land. Splash hits a 3×3 area, including you.'; }
+      else if (this.mode === 'rail') {
+        for (const p of railTargets(s)) r.highlights.set(key(p), 'rail');
+        for (const e of s.enemies) if (railDirectionFor(s, e.pos)) r.highlights.set(key(e.pos), 'laser');
+        hint = 'Tap a line. The slug pierces every ship along it until an asteroid.';
+      }
       else {
         for (const p of moveTargets(s)) r.highlights.set(key(p), 'move');
         for (const e of laserTargets(s)) r.highlights.set(key(e.pos), 'laser');
         hint = s.ap > 0 ? `${s.ap} action${s.ap === 1 ? '' : 's'} left. Tap a cell to move or an enemy to fire.` : 'No actions left. End your turn.';
-        if (s.ap > 0 && s.energy < PLAYER.laser.cost) hint = 'Low energy! Move to recharge or grab a cell.';
+        if (s.ap > 0 && flakTargets(s).length >= 2 && canFlak(s)) hint = `${flakTargets(s).length} ships in flak range!`;
+        if (s.ap > 0 && s.energy < PLAYER.flak.cost) hint = 'Low energy! End the turn to recharge or grab a cell.';
       }
     }
     this.hud.update(s, this.best, this.mode, enabled);
@@ -283,7 +306,7 @@ export class App {
           r.fx.burst(c.x, c.y, 24, colors[ev.kind], 140, 3, 0.7);
           r.fx.ring(c.x, c.y, r.cell * 1.2, colors[ev.kind]);
           r.fx.text(c.x, c.y - r.cell * 0.3, `+${ev.amount} ${PICKUPS[ev.kind].name.split(' ')[0].toUpperCase()}`, colors[ev.kind], Math.max(12, r.cell * 0.32));
-          this.hud.update(s, this.best, this.mode, { move: false, laser: false, missile: false, boost: false });
+          this.hud.update(s, this.best, this.mode, NONE);
           await sleep(300);
           break;
         }
@@ -317,6 +340,39 @@ export class App {
           await sleep(500);
           break;
         }
+        case 'rail': {
+          const shooter = r.ships.get(ev.shooterId);
+          const from = shooter ? r.centre({ x: shooter.x, y: shooter.y }) : r.centre(ev.from);
+          const to = r.centre(ev.to);
+          if (shooter) shooter.facing = Math.atan2(to.y - from.y, to.x - from.x);
+          // extend the beam half a cell past the last cell so it reads as a full-length shot
+          const ang = Math.atan2(to.y - from.y, to.x - from.x);
+          const end = { x: to.x + Math.cos(ang) * r.cell * 0.5, y: to.y + Math.sin(ang) * r.cell * 0.5 };
+          this.sfx.play('rail');
+          r.fx.beam(from.x, from.y, end.x, end.y, '#ffffff', 7, 0.5);
+          r.fx.beam(from.x, from.y, end.x, end.y, '#9df0ff', 14, 0.35);
+          r.fx.ring(from.x, from.y, r.cell * 0.9, '#9df0ff', 0.4, 3);
+          r.shake(14);
+          await sleep(140);
+          for (const hit of ev.hits) this.showDamage(hit, 'laser');
+          if (!ev.hits.length) r.fx.text(end.x, end.y, 'MISS', '#8ea2c9', Math.max(12, r.cell * 0.3));
+          await sleep(420);
+          break;
+        }
+        case 'flak': {
+          const v = r.ships.get(ev.id);
+          const c = v ? r.centre({ x: v.x, y: v.y }) : r.centre(ev.pos);
+          this.sfx.play('flak');
+          r.fx.ring(c.x, c.y, r.cell * 2.6, '#ffc64a', 0.5, 5);
+          r.fx.ring(c.x, c.y, r.cell * 2.0, '#ffffff', 0.35, 2);
+          r.fx.burst(c.x, c.y, 70, '#ffd27a', r.cell * 7, 2.5, 0.45);
+          r.fx.burst(c.x, c.y, 30, '#ffffff', r.cell * 5, 1.8, 0.3);
+          r.shake(8);
+          await sleep(160);
+          for (const hit of ev.hits) this.showDamage(hit, 'laser');
+          await sleep(400);
+          break;
+        }
         case 'boost': {
           const v = r.ships.get(ev.id);
           if (v) {
@@ -334,7 +390,7 @@ export class App {
         case 'destroyed': {
           const v = r.ships.get(ev.id);
           const c = v ? r.centre({ x: v.x, y: v.y }) : r.centre(ev.pos);
-          const big = ev.kind === 'warlord' || ev.kind === 'dreadnought';
+          const big = ev.kind === 'warlord' || ev.kind === 'battlecruiser' || ev.kind === 'destroyer';
           r.ships.delete(ev.id);
           r.fx.explosion(c.x, c.y, big);
           r.shake(big ? 18 : 10);
@@ -342,7 +398,7 @@ export class App {
           try { navigator.vibrate?.(big ? 80 : 40); } catch { /* ignore */ }
           r.fx.text(c.x, c.y - r.cell * 0.2, `+${ev.points}`, '#ffc64a', Math.max(14, r.cell * 0.4));
           if (ev.combo > 1) this.hud.banner(`Combo ×${ev.combo}`, 'bonus points', 'gold');
-          this.hud.update(s, this.best, this.mode, { move: false, laser: false, missile: false, boost: false });
+          this.hud.update(s, this.best, this.mode, NONE);
           await sleep(big ? 650 : 420);
           break;
         }
@@ -350,7 +406,7 @@ export class App {
           this.sfx.play('waveClear');
           this.hud.banner('Wave clear!', `+${ev.bonus.toLocaleString()} bonus`, 'gold');
           this.hud.hint('');
-          this.hud.update(s, this.best, null, { move: false, laser: false, missile: false, boost: false });
+          this.hud.update(s, this.best, null, NONE);
           break;
         }
         case 'gameOver': {
@@ -362,7 +418,7 @@ export class App {
           r.shake(24);
           this.hud.flash();
           this.hud.hint('');
-          this.hud.update(s, this.best, null, { move: false, laser: false, missile: false, boost: false });
+          this.hud.update(s, this.best, null, NONE);
           break;
         }
       }
@@ -391,12 +447,9 @@ export class App {
       r.shake(hit.hullDamage > 0 ? 12 : 6);
       this.sfx.play(hit.hullDamage > 0 ? 'hullHit' : 'shieldHit');
       try { navigator.vibrate?.(hit.hullDamage > 0 ? 60 : 25); } catch { /* ignore */ }
-      this.hud.update(s, this.best, this.mode, { move: false, laser: false, missile: false, boost: false });
+      this.hud.update(s, this.best, this.mode, NONE);
     } else if (source !== 'missile') {
       r.shake(4);
     }
   }
 }
-
-// keep the helper referenced for tooling
-export { shipAt };

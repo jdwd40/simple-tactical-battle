@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canBoost, createGame, endPlayerTurn, laserTargets, missileTargets, moveTargets, playerBoost, playerLaser,
-  playerMissile, playerMove, runEnemyTurn, startWave,
+  canBoost, canFlak, canRail, createGame, endPlayerTurn, flakTargets, laserTargets, missileTargets, moveTargets, playerBoost, playerFlak,
+  playerLaser, playerMissile, playerMove, playerRail, railDirectionFor, runEnemyTurn, startWave,
 } from './state';
 import { PLAYER, waveRoster } from './rules';
 import { cheb } from './grid';
@@ -71,6 +71,47 @@ describe('player actions', () => {
     if (ev.type === 'missile') expect(ev.hits.map((h) => h.targetId).sort()).toEqual([s.player.id, enemy.id].sort());
     expect(s.player.shield).toBe(PLAYER.shield - PLAYER.missile.splash);
     expect(s.missiles).toBe(PLAYER.missiles - 1);
+  });
+
+  it('railgun pierces every ship on a line and then cools down', () => {
+    const s = game();
+    s.asteroids = [];
+    const [a, b] = s.enemies;
+    a.pos = { x: s.player.pos.x, y: s.player.pos.y - 2 };
+    b.pos = { x: s.player.pos.x, y: s.player.pos.y - 4 };
+    a.hull = b.hull = 100;
+    expect(canRail(s)).toBe(true);
+    expect(railDirectionFor(s, { x: s.player.pos.x, y: 0 })).toEqual({ x: 0, y: -1 });
+    expect(railDirectionFor(s, { x: s.player.pos.x + 1, y: s.player.pos.y - 3 })).toBeNull();
+    const events = playerRail(s, { x: s.player.pos.x, y: 0 });
+    const ev = events[0];
+    expect(ev.type).toBe('rail');
+    if (ev.type === 'rail') expect(ev.hits).toHaveLength(2);
+    expect(canRail(s)).toBe(false);
+    expect(s.railCooldown).toBe(PLAYER.rail.cooldown + 1);
+    endPlayerTurn(s); runEnemyTurn(s);
+    expect(s.railCooldown).toBe(PLAYER.rail.cooldown);
+  });
+
+  it('railgun stops at asteroids', () => {
+    const s = game();
+    const enemy = s.enemies[0];
+    enemy.pos = { x: s.player.pos.x, y: s.player.pos.y - 3 };
+    s.asteroids = [{ x: s.player.pos.x, y: s.player.pos.y - 2 }];
+    expect(railDirectionFor(s, enemy.pos)).toBeNull();
+  });
+
+  it('flak hits everything within two cells', () => {
+    const s = game();
+    s.asteroids = [];
+    const [a, b] = s.enemies;
+    a.pos = { x: s.player.pos.x + 1, y: s.player.pos.y - 1 };
+    b.pos = { x: s.player.pos.x - 2, y: s.player.pos.y - 2 };
+    expect(flakTargets(s)).toHaveLength(2);
+    expect(canFlak(s)).toBe(true);
+    const events = playerFlak(s);
+    if (events[0].type === 'flak') expect(events[0].hits).toHaveLength(2);
+    expect(s.energy).toBe(PLAYER.energy - PLAYER.flak.cost);
   });
 
   it('boost recharges shields for energy', () => {

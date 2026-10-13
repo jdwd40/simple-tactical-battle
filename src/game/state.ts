@@ -64,6 +64,7 @@ export function createGame(seed = Date.now() % 1_000_000): GameState {
     enemies: [],
     pickups: [],
     comboKills: 0,
+    railCooldown: 0,
     nextId: 2,
   };
   return state;
@@ -84,6 +85,7 @@ export function startWave(s: GameState): GameEvent[] {
     s.missiles = Math.min(s.maxMissiles, s.missiles + 1);
   }
   s.energy = s.maxEnergy;
+  s.railCooldown = 0;
 
   const roster = waveRoster(s.wave);
   for (let attempt = 0; attempt < 50; attempt++) {
@@ -93,12 +95,12 @@ export function startWave(s: GameState): GameEvent[] {
     const taken = new Set<string>([key(s.player.pos)]);
     const count = randInt(rng, 7, 11);
     for (let i = 0; i < count; i++) {
-      const p = { x: randInt(rng, 0, s.cols - 1), y: randInt(rng, 2, s.rows - 3) };
+      const p = { x: randInt(rng, 0, s.cols - 1), y: randInt(rng, 3, s.rows - 3) };
       if (taken.has(key(p)) || cheb(p, s.player.pos) < 2) continue;
       taken.add(key(p));
       s.asteroids.push(p);
     }
-    const topCells = shuffle(rng, Array.from({ length: s.cols * 2 }, (_, i) => ({ x: i % s.cols, y: Math.floor(i / s.cols) })));
+    const topCells = shuffle(rng, Array.from({ length: s.cols * 3 }, (_, i) => ({ x: i % s.cols, y: Math.floor(i / s.cols) })));
     for (const kind of roster) {
       const p = topCells.find((c) => !taken.has(key(c)));
       if (!p) break;
@@ -169,6 +171,51 @@ export function missileTargets(s: GameState): Vec[] {
     }
   }
   return out;
+}
+
+const LINES: Vec[] = [
+  { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+  { x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: -1, y: -1 },
+];
+
+/** Cells along a straight line from the player until the edge or an asteroid. */
+export function railLine(s: GameState, dir: Vec): Vec[] {
+  const g = gridInfo(s);
+  const out: Vec[] = [];
+  let p = { x: s.player.pos.x + dir.x, y: s.player.pos.y + dir.y };
+  while (p.x >= 0 && p.y >= 0 && p.x < s.cols && p.y < s.rows && !g.blocked.has(key(p))) {
+    out.push(p);
+    p = { x: p.x + dir.x, y: p.y + dir.y };
+  }
+  return out;
+}
+
+export function canRail(s: GameState): boolean {
+  return s.phase === 'player' && s.ap >= 1 && s.energy >= PLAYER.rail.cost && s.railCooldown === 0;
+}
+
+/** Every cell the railgun could pass through, keyed by direction. */
+export function railTargets(s: GameState): Vec[] {
+  if (!canRail(s)) return [];
+  return LINES.flatMap((d) => railLine(s, d));
+}
+
+export function railDirectionFor(s: GameState, cell: Vec): Vec | null {
+  const dx = Math.sign(cell.x - s.player.pos.x), dy = Math.sign(cell.y - s.player.pos.y);
+  if (dx === 0 && dy === 0) return null;
+  const ax = Math.abs(cell.x - s.player.pos.x), ay = Math.abs(cell.y - s.player.pos.y);
+  if (!(ax === 0 || ay === 0 || ax === ay)) return null;
+  const dir = { x: dx, y: dy };
+  return railLine(s, dir).some((p) => same(p, cell)) ? dir : null;
+}
+
+export function flakTargets(s: GameState): Ship[] {
+  const g = gridInfo(s);
+  return s.enemies.filter((e) => cheb(e.pos, s.player.pos) <= PLAYER.flak.range && hasLineOfSight(g, s.player.pos, e.pos));
+}
+
+export function canFlak(s: GameState): boolean {
+  return s.phase === 'player' && s.ap >= 1 && s.energy >= PLAYER.flak.cost && flakTargets(s).length > 0;
 }
 
 export function canBoost(s: GameState): boolean {
@@ -301,6 +348,39 @@ function missileBlast(s: GameState, at: Vec, damage: number, splash: number): Da
   return hits;
 }
 
+export function playerRail(s: GameState, cell: Vec): GameEvent[] {
+  const events: GameEvent[] = [];
+  const dir = canRail(s) ? railDirectionFor(s, cell) : null;
+  if (!dir) return events;
+  s.ap -= 1;
+  s.energy -= PLAYER.rail.cost;
+  s.railCooldown = PLAYER.rail.cooldown + 1;
+  s.player.facing = Math.atan2(dir.y, dir.x);
+  const line = railLine(s, dir);
+  const hits: DamageResult[] = [];
+  for (const p of line) {
+    const target = s.enemies.find((e) => same(e.pos, p));
+    if (target) hits.push(applyDamage(target, PLAYER.rail.damage, false));
+  }
+  const end = line[line.length - 1] ?? { ...s.player.pos };
+  events.push({ type: 'rail', shooterId: s.player.id, from: { ...s.player.pos }, to: end, hits });
+  resolveDeaths(s, events);
+  checkWaveClear(s, events);
+  return events;
+}
+
+export function playerFlak(s: GameState): GameEvent[] {
+  const events: GameEvent[] = [];
+  if (!canFlak(s)) return events;
+  s.ap -= 1;
+  s.energy -= PLAYER.flak.cost;
+  const hits = flakTargets(s).map((e) => applyDamage(e, PLAYER.flak.damage, false));
+  events.push({ type: 'flak', id: s.player.id, pos: { ...s.player.pos }, hits });
+  resolveDeaths(s, events);
+  checkWaveClear(s, events);
+  return events;
+}
+
 export function playerBoost(s: GameState): GameEvent[] {
   if (!canBoost(s)) return [];
   s.ap -= 1;
@@ -374,6 +454,7 @@ export function runEnemyTurn(s: GameState): GameEvent[] {
     s.phase = 'player';
     s.ap = s.maxAp;
     s.energy = Math.min(s.maxEnergy, s.energy + PLAYER.energyRegen);
+    s.railCooldown = Math.max(0, s.railCooldown - 1);
     s.comboKills = 0;
     events.push({ type: 'turnStart', who: 'player' });
   }

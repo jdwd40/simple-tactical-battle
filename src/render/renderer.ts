@@ -1,9 +1,9 @@
 import type { GameState, PickupKind, Ship, Vec } from '../game/types';
 import { key } from '../game/grid';
-import { drawShip, shipColor } from './ships';
+import { drawShip, shipColor, shipSize } from './ships';
 import { Effects } from './effects';
 
-export type HighlightKind = 'move' | 'laser' | 'missile' | 'threat' | 'selected' | 'path';
+export type HighlightKind = 'move' | 'laser' | 'missile' | 'rail' | 'threat' | 'selected' | 'path';
 
 export interface VShip {
   id: number;
@@ -238,7 +238,7 @@ export class Renderer {
     const px = x * cell, py = y * cell;
     const inset = 3;
     const colors: Record<HighlightKind, string> = {
-      move: '64, 224, 255', laser: '255, 79, 163', missile: '255, 198, 74', threat: '255, 70, 110', selected: '255, 255, 255', path: '64, 224, 255',
+      move: '64, 224, 255', laser: '255, 79, 163', missile: '255, 198, 74', rail: '157, 240, 255', threat: '255, 70, 110', selected: '255, 255, 255', path: '64, 224, 255',
     };
     const c = colors[kind];
     ctx.fillStyle = `rgba(${c}, ${0.12 + pulse * 0.08})`;
@@ -361,7 +361,7 @@ export class Renderer {
     if (v.shield > 0 || v.shieldFlash > 0) {
       const a = 0.12 + (v.shield / Math.max(1, v.maxShield)) * 0.2 + v.shieldFlash * 0.6;
       ctx.beginPath();
-      ctx.arc(0, 0, cell * 0.46, 0, Math.PI * 2);
+      ctx.arc(0, 0, cell * Math.min(0.48, shipSize(v.kind) + 0.1), 0, Math.PI * 2);
       ctx.fillStyle = `rgba(64, 224, 255, ${(a * 0.4).toFixed(3)})`;
       ctx.fill();
       ctx.strokeStyle = `rgba(120, 235, 255, ${a.toFixed(3)})`;
@@ -369,7 +369,7 @@ export class Renderer {
       ctx.stroke();
     }
     ctx.rotate(v.facing);
-    drawShip(ctx, v.kind, cell * 0.36, this.time, v.hitFlash);
+    drawShip(ctx, v.kind, cell * shipSize(v.kind), this.time, v.hitFlash);
     ctx.restore();
 
     // health bar for enemies / low player

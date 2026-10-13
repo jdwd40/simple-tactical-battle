@@ -3,7 +3,7 @@ export interface Vec {
   y: number;
 }
 
-export type EnemyKind = 'scout' | 'frigate' | 'dreadnought' | 'warlord';
+export type EnemyKind = 'fighter' | 'corvette' | 'cruiser' | 'destroyer' | 'battlecruiser' | 'warlord';
 export type PickupKind = 'energy' | 'shield' | 'missile' | 'repair';
 export type Facing = number; // radians
 
@@ -48,10 +48,12 @@ export interface GameState {
   pickups: Pickup[];
   /** Kills made this player turn, for combo scoring. */
   comboKills: number;
+  /** Turns until the railgun can fire again. */
+  railCooldown: number;
   nextId: number;
 }
 
-export type ActionMode = 'move' | 'laser' | 'missile' | 'boost';
+export type ActionMode = 'move' | 'laser' | 'missile' | 'rail' | 'flak' | 'boost';
 
 export interface DamageResult {
   targetId: number;
@@ -65,6 +67,8 @@ export type GameEvent =
   | { type: 'move'; id: number; path: Vec[] }
   | { type: 'laser'; shooterId: number; from: Vec; to: Vec; hit: DamageResult }
   | { type: 'missile'; shooterId: number; from: Vec; to: Vec; hits: DamageResult[] }
+  | { type: 'rail'; shooterId: number; from: Vec; to: Vec; hits: DamageResult[] }
+  | { type: 'flak'; id: number; pos: Vec; hits: DamageResult[] }
   | { type: 'boost'; id: number; amount: number }
   | { type: 'pickup'; id: number; kind: PickupKind; pos: Vec; amount: number }
   | { type: 'destroyed'; id: number; kind: Ship['kind']; pos: Vec; points: number; combo: number }

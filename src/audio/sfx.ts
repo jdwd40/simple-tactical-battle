@@ -4,7 +4,7 @@
  */
 export type SfxName =
   | 'click' | 'select' | 'move' | 'laser' | 'enemyLaser' | 'missileLaunch' | 'explosion' | 'bigExplosion'
-  | 'shieldHit' | 'hullHit' | 'boost' | 'pickup' | 'crit' | 'waveStart' | 'waveClear' | 'gameOver' | 'warning';
+  | 'rail' | 'flak' | 'shieldHit' | 'hullHit' | 'boost' | 'pickup' | 'crit' | 'waveStart' | 'waveClear' | 'gameOver' | 'warning';
 
 const STORAGE_KEY = 'stb.muted';
 
@@ -49,6 +49,8 @@ export class Sfx {
       case 'select': this.tone('sine', 740, 0.08, 0.15, t, 980); break;
       case 'move': this.noise(0.25, 0.12, t, 900, 200); this.tone('sine', 220, 0.2, 0.08, t, 160); break;
       case 'laser': this.tone('sawtooth', 1400, 0.18, 0.25, t, 180); this.tone('square', 900, 0.1, 0.1, t, 300); break;
+      case 'rail': this.noise(0.5, 0.35, t, 4000, 300); this.sweep('sawtooth', 2200, 120, 0.5, 0.3, t); this.tone('sine', 60, 0.5, 0.4, t, 30); break;
+      case 'flak': for (let i = 0; i < 5; i++) this.noise(0.12, 0.3, t + i * 0.05, 2500, 400); this.tone('square', 150, 0.3, 0.2, t, 60); break;
       case 'enemyLaser': this.tone('sawtooth', 700, 0.2, 0.22, t, 120); break;
       case 'missileLaunch': this.noise(0.5, 0.3, t, 300, 2500); this.tone('triangle', 160, 0.45, 0.2, t, 520); break;
       case 'explosion': this.noise(0.6, 0.6, t, 1600, 80); this.tone('sine', 110, 0.5, 0.45, t, 30); break;
