@@ -86,11 +86,13 @@ const LABEL_STYLE: TextStyleOptions = { fontFamily: PLOT_FONT, fontSize: 13, fon
 class LabelPool {
   private readonly labels = new Map<string, Text>()
   private used = new Set<string>()
+  /** Canvas width; a left-anchored label that would overflow it flips to `flipX`, right-anchored. */
+  width = Infinity
   constructor(private readonly layer: Container) {}
 
   begin() { this.used = new Set() }
 
-  place(key: string, text: string, x: number, y: number, fill: number, anchorX = 0, anchorY = 0.5) {
+  place(key: string, text: string, x: number, y: number, fill: number, anchorX = 0, anchorY = 0.5, flipX?: number) {
     let label = this.labels.get(key)
     if (!label) {
       label = new Text({ text, style: { ...LABEL_STYLE, fill } })
@@ -99,8 +101,9 @@ class LabelPool {
     }
     if (label.text !== text) label.text = text
     label.style.fill = fill
-    label.anchor.set(anchorX, anchorY)
-    label.position.set(Math.round(x), Math.round(y))
+    const flip = anchorX === 0 && flipX !== undefined && x + label.width > this.width - 2
+    label.anchor.set(flip ? 1 : anchorX, anchorY)
+    label.position.set(Math.round(flip ? flipX : x), Math.round(y))
     label.visible = true
     this.used.add(key)
   }
@@ -313,6 +316,7 @@ export class BattlefieldRenderer {
     const transform = this.transform
     const labels = this.labels
     if (!app || !transform || !labels) return
+    labels.width = app.screen.width
     labels.begin()
     const sensorRings = this.drawSensorRings(scene, transform, labels)
     this.drawPlan(scene, transform, labels)
@@ -499,7 +503,7 @@ export class BattlefieldRenderer {
         g.stroke({ width: 2, color: PLOT_COLOURS.hostile })
       }
       const label = missile.kind === 'current' ? `${missile.alias} (hostile missile)` : `${missile.alias} (last seen, ${((missile.ageTicks * tickMs) / 1000).toFixed(1)} s ago)`
-      labels.place(`hostile-missile:${missile.alias}`, label, at.x + size + 6, at.y - size - 2, PLOT_COLOURS.hostile)
+      labels.place(`hostile-missile:${missile.alias}`, label, at.x + size + 6, at.y - size - 2, PLOT_COLOURS.hostile, 0, 0.5, at.x - size - 6)
       hostileMissiles.push({ alias: missile.alias, kind: missile.kind, at, radiusPx })
     }
 
@@ -608,7 +612,7 @@ export class BattlefieldRenderer {
         : contact.kind === 'current' ? 'current'
           : `last known, ${((contact.ageTicks * tickMs) / 1000).toFixed(1)} s ago`
       const label = `${contact.alias} (${status})`
-      labels.place(`contact:${contact.alias}`, label, at.x + size + 5, at.y - size - 2, PLOT_COLOURS.hostile)
+      labels.place(`contact:${contact.alias}`, label, at.x + size + 5, at.y - size - 2, PLOT_COLOURS.hostile, 0, 0.5, at.x - size - 5)
       drawn.push({ alias: contact.alias, kind: contact.kind, at, radiusPx, selected: contact.selected, label })
     }
     return drawn

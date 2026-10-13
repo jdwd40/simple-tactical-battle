@@ -37,7 +37,7 @@ function planning(own: Partial<OwnShipObservation> = {}, draft = orders(), issue
   }
 }
 
-const render = (view: GameView, activePulse = true) => renderToStaticMarkup(<GameConsole controller={fixtureController(view).controller} capabilities={{ activePulse, laser: false, missile: false }} />)
+const render = (view: GameView, activePulse = true) => renderToStaticMarkup(<GameConsole controller={fixtureController(view).controller} capabilities={{ activePulse, laser: false, missile: false }} opponentNote="The patrol is an interim script: it follows a set route and does not fire." />)
 const systems = (props: Partial<SystemOrdersProps> = {}) => renderToStaticMarkup(
   <SystemOrders
     orders={orders()} own={frameAt(200, position).observation.ownShip} tick={200} ticksResolved={0} rules={rules}

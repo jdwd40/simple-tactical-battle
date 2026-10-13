@@ -30,7 +30,7 @@ test('opens in genuine turn-1 planning with own data only and a deliberate Commi
 
   await expect(page).toHaveTitle('Shadow-Dancer — Tactical Space Battle')
   await expect(page.getByRole('heading', { level: 1, name: 'Shadow-Dancer' })).toBeVisible()
-  await expect(page.getByText('Sensor drill', { exact: true })).toBeVisible()
+  await expect(page.getByText('Combat drill', { exact: true })).toBeVisible()
   await expect(page.getByTestId('turn-number')).toHaveText('1')
   await expect(page.locator('[aria-current="step"]')).toHaveText('Planning')
   await expect(page.locator('.battlefield-canvas[data-ready="true"]')).toBeVisible()

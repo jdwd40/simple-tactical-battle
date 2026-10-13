@@ -49,13 +49,15 @@ export interface GameConsoleProps {
   readonly controller: GameController
   /** Order kinds the running engine performs, as plain booleans from the composition root. */
   readonly capabilities: OrderCapabilities
+  /** What the opponent is, as composed by the root (the interim drill script in the application). */
+  readonly opponentNote: string
 }
 
 /**
  * The playable console. It sees only the public GameController: published immutable views
  * in, typed commands out. No engine, private state or future frames are reachable here.
  */
-export function GameConsole({ controller, capabilities }: GameConsoleProps) {
+export function GameConsole({ controller, capabilities, opponentNote }: GameConsoleProps) {
   const view = useSyncExternalStore(controller.subscribe, controller.getView, controller.getView)
   const presentation = useMemo(() => presentGameView(view), [view])
   // Contact choice is encounter-local and only marks aliases the shown frame knows.
@@ -90,6 +92,12 @@ export function GameConsole({ controller, capabilities }: GameConsoleProps) {
   const { rules } = view
   const map = view.frame.observation.map
   const own = view.frame.observation.ownShip
+
+  // An assessment or ending opens at the top of the command rail, whatever was scrolled before.
+  const railTop = view.phase === 'assessment' || view.phase === 'terminal'
+  useEffect(() => {
+    if (railTop) document.getElementById('command-rail')?.scrollTo({ top: 0 })
+  }, [railTop, view.encounterId])
 
   // Keep keyboard focus somewhere sensible when the control that held it disappears.
   useEffect(() => {
@@ -180,9 +188,7 @@ export function GameConsole({ controller, capabilities }: GameConsoleProps) {
           onWeapon={setWeapon}
           onAimingChange={setAiming}
         />
-        <p className="order-note">
-          The patrol is an interim script: it follows a set route and does not fire. The reactive patrol comes in a later version.
-        </p>
+        <p className="order-note" data-testid="opponent-note">{opponentNote}</p>
       </div>
     </Panel>
   )

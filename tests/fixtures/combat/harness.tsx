@@ -125,7 +125,7 @@ window.__plotDiagnostics = rendererDiagnostics
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <GameConsole controller={fixture.controller} capabilities={{ activePulse: true, laser: true, missile: true }} />
+    <GameConsole controller={fixture.controller} capabilities={{ activePulse: true, laser: true, missile: true }} opponentNote="Fixture frames only: no opponent or engine runs here." />
     <CommandLog />
   </StrictMode>,
 )

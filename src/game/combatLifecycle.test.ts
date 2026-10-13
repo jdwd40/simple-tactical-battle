@@ -6,10 +6,11 @@ import { createManualClock } from './presentationClock'
 import { scriptedPatrol } from './scriptedPatrol'
 
 // Application lifecycle for combat endings. The real engine resolves every turn; a test-only
-// wrapper then marks ships destroyed and records an outcome in the PRIVATE next state, as the
-// combat engine (TSB-30) will. Presentations stay the real engine's. This checks controller
-// timing only; real combat scenes are verified against the TSB-30 engine itself.
-type Script = readonly { readonly destroy?: readonly Side[]; readonly outcome?: Outcome }[]
+// wrapper then marks ships destroyed and sets or clears the outcome in the PRIVATE next state.
+// Clearing stands in for ordnance still in flight (missiles arrive in TSB-30B). Presentations
+// stay the real engine's. This checks controller timing only; real combat scenes are verified
+// against the real engine separately.
+type Script = readonly { readonly destroy?: readonly Side[]; readonly outcome?: Outcome | null }[]
 
 function patched(resolution: TurnResolution, step: Script[number] | undefined): TurnResolution {
   if (!step) return resolution
@@ -17,7 +18,7 @@ function patched(resolution: TurnResolution, step: Script[number] | undefined): 
   for (const side of step.destroy ?? []) {
     next = { ...next, ships: { ...next.ships, [side]: { ...next.ships[side], alive: false, destructionTick: next.tick - 40 } } }
   }
-  if (step.outcome) next = { ...next, outcome: { outcome: step.outcome, revealTick: next.tick } }
+  if (step.outcome !== undefined) next = { ...next, outcome: step.outcome === null ? null : { outcome: step.outcome, revealTick: next.tick } }
   return { ...resolution, nextState: next }
 }
 
@@ -103,7 +104,7 @@ describe('combat endings are revealed only at their recorded tick', () => {
 
 describe('automatic aftermath after own destruction', () => {
   it('begins each window only when the previous ends, with the living opponent planning from its own view', () => {
-    const { controller, resolveTurn, planOpponent, clock } = setup([{ destroy: ['player'] }, {}, { outcome: 'defeat' }])
+    const { controller, resolveTurn, planOpponent, clock } = setup([{ destroy: ['player'] }, { outcome: null }, { outcome: 'defeat' }])
     commitHold(controller)
     expect(planOpponent).toHaveBeenCalledTimes(1)
     controller.playback({ kind: 'seek', tick: 99 })
@@ -157,7 +158,7 @@ describe('automatic aftermath after own destruction', () => {
   it('stops at the approved aftermath bound instead of inventing a draw', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     // Both destroyed with no ammunition left: at most two automatic windows.
-    const { controller, resolveTurn } = setup([{ destroy: ['player', 'patrol'] }, {}, {}, {}, {}])
+    const { controller, resolveTurn } = setup([{ destroy: ['player', 'patrol'] }, { outcome: null }, { outcome: null }, { outcome: null }])
     commitHold(controller)
     controller.playback({ kind: 'skipToEnd' })
     const stopped = controller.getView()

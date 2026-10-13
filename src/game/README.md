@@ -14,7 +14,7 @@ const controller = createGameController({
   engine,               // optional EngineApi (default SIMULATION_ENGINE) — wrap to count/inspect calls
   planOpponent,         // optional PlanOpponent (default scriptedPatrol, the interim drill script)
 })
-<GameConsole controller={controller} capabilities={controller.capabilities} />   // public surface plus capability booleans
+<GameConsole controller={controller} capabilities={controller.capabilities} opponentNote={...} />   // public surface, capability booleans, opponent description
 controller.dispose()                       // unmount: cancels timers, pauses; commands stay usable
 ```
 

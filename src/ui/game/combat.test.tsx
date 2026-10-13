@@ -152,7 +152,7 @@ describe('assessment and endings', () => {
       getView: () => view, subscribe: () => () => {}, setDraft: () => {}, commit: () => ({ kind: 'ignored', reason: 'wrong-phase' }),
       playback: () => {}, finishAssessment: () => {}, abandon: () => {}, restart: () => {},
     }
-    return renderToStaticMarkup(<GameConsole controller={controller} capabilities={{ activePulse: true, ...all }} />)
+    return renderToStaticMarkup(<GameConsole controller={controller} capabilities={{ activePulse: true, ...all }} opponentNote="The patrol is an interim script: it follows a set route and does not fire." />)
   }
   const replay = (frames: PublicReplayFrame[], cursorTick: number): ReplayPrefix => ({
     scope: 'latest-player-turn-with-aftermath', startTick: 400, endTick: 500, cursorTick, frames, events: frames.flatMap((frame) => frame.events), playback: { playing: false, speed: 1 },
