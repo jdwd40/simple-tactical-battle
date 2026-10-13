@@ -25,8 +25,8 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
 | General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | TSB-40 /1 active;30B accepted |
 | UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-31 /1 resumed on accepted30B, final missile/aftermath verification |
-| Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | TSB-32 /1 active, bounded headless combat regressions |
-| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | Available;30B /1/round0 PASS |
+| Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | TSB-32 /1 delivered; available pending findings |
+| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | REVIEW-TSB-32 /1/round0 active |
 
 Earlier outages: Herdr stopped at 22:58:38 UTC Oct12 and 05:21 UTC Oct13. User established kernel OOM killed headless Chrome, then systemd OOMPolicy=stop ended the scope. User added 4G swap and moved Herdr to herdr.service with OOMPolicy=continue; infrastructure investigation ended. General moved p3→p8 and Assistant p6→p9; original sessions restored, existing /home/jd trust confirmations explicitly authorised and cleared. Reviewer/Assistant native resume had lost their original full-access policy; the same UUIDs were resumed with their recorded original permissions, without model changes. Reviewer browser access subsequently passed. Interrupted REVIEW-TSB-11B /2/round1 was re-run and accepted. No current recovery blocker.
 
@@ -53,7 +53,7 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-30A General /1 | general-30a / tsb/30a-lasers / c279edbd3c9c945a3bbbd472a895379dd5f22dae |d3e526eb4b0b6fed227cc799b5bc7e22614357d8 (engine0dfdbcb+docs) round0 PASS; integrated4940506/64738f4; combined226unit/build/type/lint pass; independent seed73 range/funding50/100/200ms/reversedbatch/privacy probes pass |
 | TSB-30B General /1 | general-30b / tsb/30b-missiles / 64738f42537d44aeb85f52f6282c4cf93d38d72a | deb0c6a955605c0661a3867f7cc3bfd48e57f6af (enginee027e8c+docs) round0 PASS; integrated7f01a3f/9f2e3d2; combined241unit/build/type/lint pass;6independent seed83 sweep/funding/persistence/privacy probes pass |
 | TSB-31 UI /1 | ui-31 / tsb/31-combat-ui / originalc279edb; reviewbase9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | Components9cb48d4→laserbase64738f4; realLaser44c4415b2f0ad41c41a45e5eb3bdb41004cd3b0b(248unit/33browser)→rebaseddac8ed65655a167202ceda08f2e21f5e97691553 on accepted30B; resumed finalrealverification; no UI31 review yet |
-| TSB-32 Assistant /1 | assistant-32 / tsb/32-combat-regressions / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | ACTIVE; complementary multipleimpact/expiry/unseen-death/boundedblind-tail fixtures; handoff32-a1.md |
+| TSB-32 Assistant /1 | assistant-32 / tsb/32-combat-regressions / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | Delivered38fb1cd46cba8fd1cbda44fec2288b965ba86f50;7focused/248fullunit28files/build/type/lint pass; round0 active reviews/32-r0; negativeblindhold control fails as expected |
 | TSB-40 General /1 | general-40 / tsb/40-opponent / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | ACTIVE; observation/memory/RNG-only planner, finalduel waitsM2B+41/42; handoff40-a1.md |
 
 Original assignments, reports and review verdicts: handoffs/. Exact detached snapshots: reviews/<task>-r<round>; Git worktree list records retained heads. TSB-11C report-a2/review-r1 documents the three corrected blockers: nested view immutability, re-entrant restart/abandon during commit, and blank grid fields after restart. No further review of that accepted change is pending.
@@ -75,6 +75,8 @@ Access requires the user's Tailnet or SSH forwarding; server-local reachability 
 ## Decisions, blockers and next actions
 
 Approved mechanics and numerical tuning hypotheses remain unchanged. Accepted refinements: stable getView/subscribe, encounter/revision identity, own route preview, cursor-prefix-only replay, controller-owned presentation clock, replay origin without future outcome, tick-only events with deduplicated prefixes. Latest player turn plus automatic aftermath is replay scope. See contracts/README.md and handoffs/TSB-02-ui-decisions.md.
+
+TSB-40 API connection failed mid-response around10:32UTC; no completed delivery claimed. Same original pane/session/assignment resumed after inspecting preserved untracked src/ai files at9f2e3d2. Tests/verification continue; no reset, model/session replacement or infrastructure changes.
 
 Next: collect/review exact31/32/40 deliveries, integrate accepted changes and verify M2B scriptedcombat; then41/42 completeAI duel/humanplaytest checkpoint and50/51/52 releasecandidate. No current blocker/new approval needed. UI31 browser4272 slot granted while engine review is headless; its test-only real-engine/scripted-opponent page outside public UI/fixtures and production is approved without shared guard/config changes. Original sessions/assignments preserved. Sole backlog DEVELOPMENT_PLAN.md.
 
