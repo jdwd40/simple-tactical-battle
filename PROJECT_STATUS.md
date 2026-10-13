@@ -21,10 +21,10 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | Role | Confirmed pane / tab | Original session | State |
 | --- | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
-| General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | TSB-20 /1 active; accepted10 unchanged |
+| General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | TSB-20 /1 delivered; available pending findings |
 | UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-21 /1 active; component checkpoint before accepted20 binding |
 | Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | Available;12B accepted,22 follows20/21 |
-| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | Available; REVIEW-TSB-12B /1/round0 PASS |
+| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | REVIEW-TSB-20 /1/round0 active;12B PASS preserved |
 
 Earlier outages: Herdr stopped at 22:58:38 UTC Oct12 and 05:21 UTC Oct13. User established kernel OOM killed headless Chrome, then systemd OOMPolicy=stop ended the scope. User added 4G swap and moved Herdr to herdr.service with OOMPolicy=continue; infrastructure investigation ended. General moved p3→p8 and Assistant p6→p9; original sessions restored, existing /home/jd trust confirmations explicitly authorised and cleared. Reviewer/Assistant native resume had lost their original full-access policy; the same UUIDs were resumed with their recorded original permissions, without model changes. Reviewer browser access subsequently passed. Interrupted REVIEW-TSB-11B /2/round1 was re-run and accepted. No current recovery blocker.
 
@@ -45,7 +45,7 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-11B UI /1→2 | ui-11b / tsb/11b-battlefield / cf58c7d1c531191be470d9b45646d30860413f37 | e81ce79 round0 CHANGES_REQUIRED; fixedfd611b78eec3ee5260b71eb59cdb599ee84e9297 round1 PASS; integrated7258b77/f4d77dc; post-OOM82unit/15browser independentpass; combined136unit/15browser passed |
 | TSB-11C UI /1→2 | ui-11c / tsb/11c-playable / f4d77dc649497be98d63de63da4d06dd5e123be7 |0f8378d7 round0 CHANGES_REQUIRED3medium; corrected06601d1eca25977364e343a901984ae6d349f844 round1 PASS;163unit/23browser/build/type/lint/production independentlypass; integrated e33d043/fbea50e; combined 163unit/23browser/build/type/lint PASS |
 | TSB-12B Assistant /1 | assistant-12b / tsb/12b-lifecycle / fbea50ed56d6809fd06a91fd1343bb0a38016981 |1f70d8c0972ae0856c462768c3135ce912bb542b; round0 PASS; integrated850d987; combined166unit/24browser/build/type/lint PASS |
-| TSB-20 General /1 | general-20 / tsb/20-sensors / 850d98787ccd6fa32a2bc15bc481a2b976f29430 | ACTIVE; sensors/cloak/knowledge; handoff TSB-20-a1.md |
+| TSB-20 General /1 | general-20 / tsb/20-sensors / 850d98787ccd6fa32a2bc15bc481a2b976f29430 | Delivered85c8c510dec194e3807a8efcfaf3b474915c7281;180unit/22files,build/type/lint pass; independent round0 active in reviews/20-r0 |
 | TSB-21 UI /1 | ui-21 / tsb/21-sensors / 850d98787ccd6fa32a2bc15bc481a2b976f29430 | ACTIVE; sensor/cloak controls and contact feedback; clean checkpoint then accepted20 binding; handoff TSB-21-a1.md |
 
 Original assignments, reports and review verdicts: handoffs/. Exact detached snapshots: reviews/<task>-r<round>; Git worktree list records retained heads. TSB-11C report-a2/review-r1 documents the three corrected blockers: nested view immutability, re-entrant restart/abandon during commit, and blank grid fields after restart. No further review of that accepted change is pending.
