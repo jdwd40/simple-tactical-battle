@@ -299,3 +299,93 @@ describe('createGameController: restart, abandon and disposal', () => {
     expect(withReplay(controller.getView()).replay.cursorTick).toBe(3)
   })
 })
+
+/** Every reachable object in a published view must be frozen; returns the first mutable path. */
+function firstMutable(value: unknown, path = 'view', seen = new Set<object>()): string | null {
+  if (value === null || typeof value !== 'object' || seen.has(value)) return null
+  seen.add(value)
+  if (!Object.isFrozen(value)) return path
+  for (const [key, child] of Object.entries(value)) {
+    const found = firstMutable(child, `${path}.${key}`, seen)
+    if (found) return found
+  }
+  return null
+}
+
+describe('createGameController: published data is recursively immutable', () => {
+  it('freezes every view in every phase, including hold and invalid previews and the terminal result', () => {
+    const { controller, clock } = setup()
+    const views: GameView[] = [controller.getView()]
+    const hold = controller.getView()
+    expect(planning(hold).routePreview.kind).toBe('hold')
+    expect(Reflect.set((planning(hold).routePreview as { position: { x: number } }).position, 'x', 9999)).toBe(false)
+    expect(controller.getView()).toBe(hold)
+    expect(json(controller.getView())).not.toContain('9999')
+
+    controller.setDraft({ ...planning(hold).draft, movement: { kind: 'destination', cell: { column: 7, row: 4 } } })
+    views.push(controller.getView())
+    commitEast(controller)
+    views.push(controller.getView())
+    clock.advance(1500)
+    views.push(controller.getView())
+    controller.playback({ kind: 'skipToEnd' })
+    views.push(controller.getView())
+    controller.playback({ kind: 'seek', tick: 40 })
+    views.push(controller.getView())
+    controller.abandon()
+    views.push(controller.getView())
+    expect(views.map((view) => view.phase)).toEqual(['planning', 'planning', 'execution', 'execution', 'assessment', 'execution', 'terminal'])
+    for (const view of views) expect(firstMutable(view)).toBeNull()
+  })
+})
+
+describe('createGameController: re-entrant lifecycle during commit publication', () => {
+  for (const action of ['restart', 'abandon'] as const) {
+    it(`a subscriber that calls ${action} on the commit phase keeps that result; the old commit cannot resume`, () => {
+      const { controller, clock } = setup()
+      const draft = planning(controller.getView()).draft
+      controller.setDraft({ ...draft, movement: EAST })
+      let acted = false
+      controller.subscribe(() => {
+        if (!acted && controller.getView().phase === 'commit') {
+          acted = true
+          if (action === 'restart') controller.restart({ kind: 'same-seed' })
+          else controller.abandon()
+        }
+      })
+      const result = controller.commit(0)
+      const after = controller.getView()
+      expect(result).toEqual({ kind: 'ignored', reason: 'wrong-phase' })
+      if (action === 'restart') {
+        expect(after).toMatchObject({ phase: 'planning', encounterId: 'encounter-2' })
+        expect(planning(after).draft.movement).toEqual({ kind: 'hold' })
+        expect(planning(after).frame.observation.ownShip.position).toEqual({ x: 3500, y: 10_500 })
+      } else {
+        expect(after).toMatchObject({ phase: 'terminal', encounterId: 'encounter-1', result: { kind: 'abandoned' } })
+      }
+      expect(clock.pending).toBe(0)
+      clock.advance(20_000)
+      expect(controller.getView()).toBe(after)
+      expect(controller.commit(0)).toEqual(action === 'restart' ? expect.objectContaining({ kind: 'accepted' }) : { kind: 'ignored', reason: 'wrong-phase' })
+    })
+  }
+
+  it('a restart on the execution publication leaves the fresh encounter untouched by the accepted turn', () => {
+    const { controller, clock } = setup()
+    controller.setDraft({ ...planning(controller.getView()).draft, movement: EAST })
+    let acted = false
+    controller.subscribe(() => {
+      if (!acted && controller.getView().phase === 'execution') {
+        acted = true
+        controller.restart({ kind: 'same-seed' })
+      }
+    })
+    const result = controller.commit(0)
+    expect(result.kind).toBe('accepted')
+    const after = controller.getView()
+    expect(after).toMatchObject({ phase: 'planning', encounterId: 'encounter-2' })
+    expect(clock.pending).toBe(0)
+    clock.advance(20_000)
+    expect(controller.getView()).toBe(after)
+  })
+})

@@ -72,7 +72,17 @@ interface Encounter {
   lastFrame: PublicReplayFrame | null
 }
 
-const freezeArray = <T>(items: T[]): readonly T[] => Object.freeze(items)
+/** Subtrees already frozen all the way down, so recorded frames are walked only once. */
+const deepFrozen = new WeakSet<object>()
+
+/** Recursively freezes everything the controller publishes; engine output is not trusted to be. */
+function freezeDeep<T>(value: T): T {
+  if (value === null || typeof value !== 'object' || deepFrozen.has(value)) return value
+  for (const child of Object.values(value)) freezeDeep(child)
+  Object.freeze(value)
+  deepFrozen.add(value)
+  return value
+}
 
 export function createGameController(options: GameControllerOptions): ApplicationController {
   const engine = options.engine ?? SIMULATION_ENGINE
@@ -145,15 +155,15 @@ export function createGameController(options: GameControllerOptions): Applicatio
       }
     }
     events.sort((a, b) => a.tick - b.tick || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    return Object.freeze({
+    return {
       scope: 'latest-player-turn-with-aftermath',
       startTick: presentation.startTick,
       endTick: presentation.endTick,
       cursorTick: cursor,
-      frames: freezeArray(frames),
-      events: freezeArray(events),
-      playback: Object.freeze({ playing, speed }),
-    })
+      frames,
+      events,
+      playback: { playing, speed },
+    }
   }
 
   function buildView(): GameView {
@@ -177,11 +187,14 @@ export function createGameController(options: GameControllerOptions): Applicatio
     }
   }
 
-  function publish() {
+  /** Publishes a new immutable view and returns its revision (listeners may publish again). */
+  function publish(): number {
     revision += 1
-    view = Object.freeze(buildView())
+    const published = revision
+    view = freezeDeep(buildView())
     encounter.lastFrame = view.frame
     for (const listener of [...listeners]) listener()
+    return published
   }
 
   function stopTimer() {
@@ -254,36 +267,34 @@ export function createGameController(options: GameControllerOptions): Applicatio
       const validation = engine.validateOrders(planning.draft, planning.observation, rules)
       if (!validation.structurallyValid) return { kind: 'rejected', validation }
 
-      // Lock both envelopes before any tick runs, then resolve exactly once.
-      encounter.phase = 'commit'
-      publish()
-      const state = encounter.state
+      // Both envelopes are already frozen; resolve exactly once, privately, before publishing.
+      const owner = encounter
+      const state = owner.state
       const prepared: SimulationState = freezeData({
         ...state,
         plannerMemory: { ...state.plannerMemory, patrol: planning.opponent.memory },
         random: { ...state.random, planners: { ...state.random.planners, patrol: planning.opponent.plannerRandomState } },
       })
-      let resolution
-      try {
-        resolution = engine.resolveTurn(prepared, {
-          turnIndex: state.turnIndex, startTick: state.tick, automatic: false,
-          orders: { player: planning.draft, patrol: planning.opponent.orders },
-        }, rules, scenario)
-      } catch (error) {
-        encounter.phase = 'planning'
-        publish()
-        throw error
-      }
-      encounter.state = resolution.nextState
-      encounter.turn = { locked: planning.draft, presentation: resolution.presentations.player }
-      encounter.planning = null
-      encounter.phase = 'execution'
-      encounter.replayOf = null
-      encounter.cursor = resolution.presentations.player.startTick
-      playing = true
+      const resolution = engine.resolveTurn(prepared, {
+        turnIndex: state.turnIndex, startTick: state.tick, automatic: false,
+        orders: { player: planning.draft, patrol: planning.opponent.orders },
+      }, rules, scenario)
+
+      owner.phase = 'commit'
       publish()
+      // A subscriber may have restarted or abandoned during that publication; never resume it.
+      if (encounter !== owner || owner.phase !== 'commit') return { kind: 'ignored', reason: 'wrong-phase' }
+
+      owner.state = resolution.nextState
+      owner.turn = { locked: planning.draft, presentation: resolution.presentations.player }
+      owner.planning = null
+      owner.phase = 'execution'
+      owner.replayOf = null
+      owner.cursor = resolution.presentations.player.startTick
+      playing = true
+      const accepted = publish()
       scheduleTick()
-      return { kind: 'accepted', turnIndex: expectedTurnIndex, revision }
+      return { kind: 'accepted', turnIndex: expectedTurnIndex, revision: accepted }
     },
 
     playback(command: PlaybackCommand) {
@@ -359,7 +370,7 @@ export function createGameController(options: GameControllerOptions): Applicatio
   }
 
   encounter = newEncounter()
-  view = Object.freeze(buildView())
+  view = freezeDeep(buildView())
   encounter.lastFrame = view.frame
   return controller
 }

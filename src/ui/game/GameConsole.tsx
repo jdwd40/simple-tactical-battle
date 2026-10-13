@@ -77,6 +77,8 @@ export function GameConsole({ controller }: { controller: GameController }) {
   const ordersPanel = presentation.movement && orders && (
     <Panel title="Orders" status={<StatusTag>{view.phase === 'planning' ? 'Draft' : 'Locked'}</StatusTag>}>
       <MovementOrders
+        // Entry fields are encounter-local: a restart starts them blank.
+        key={view.encounterId}
         movement={presentation.movement}
         issues={presentation.issues}
         preview={presentation.routePreview}

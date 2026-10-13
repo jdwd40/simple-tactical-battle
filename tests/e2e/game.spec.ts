@@ -180,6 +180,47 @@ test('restart during execution and repeated restarts leave one fresh encounter a
   expect(errors).toEqual([])
 })
 
+test('restart clears encounter-local entry fields and pointer readout, keeping focus on Restart', async ({ page }, testInfo) => {
+  await open(page)
+  const column = page.getByLabel('Column')
+  const row = page.getByLabel('Row')
+  await expect(column).toHaveValue('')
+  await expect(row).toHaveValue('')
+  const restart = page.getByRole('button', { name: 'Restart', exact: true })
+
+  // Typed but uncommitted entry, plus a hovered cell, during planning.
+  await column.fill('16')
+  await row.fill('10')
+  const { origin, cellPx } = await drawn(page)
+  const box = (await page.locator('.battlefield-canvas canvas').boundingBox())!
+  await page.mouse.move(box.x + origin.x + 8.5 * cellPx, box.y + origin.y + 4.5 * cellPx)
+  await expect(readout(page)).toContainText('Pointercolumn 8, row 4')
+  await restart.click()
+  await expect(column).toHaveValue('')
+  await expect(row).toHaveValue('')
+  await expect(readout(page)).not.toContainText('Pointer')
+  await expect(restart).toBeFocused()
+
+  // Committed course, restarted mid-execution.
+  await commitTo(page, 16, 10)
+  await expect(column).toHaveValue('16')
+  await restart.click()
+  await expect(phase(page)).toHaveText('Planning')
+  await expect(page.getByTestId('movement-order')).toHaveText('Hold position')
+  await expect(column).toHaveValue('')
+  await expect(row).toHaveValue('')
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('restart-cleared-entry.png') })
+
+  // Abandoned, then restarted from the encounter-ended panel.
+  await commitTo(page, 12, 9)
+  await page.getByRole('button', { name: 'Abandon' }).click()
+  await page.getByRole('button', { name: 'Restart encounter' }).click()
+  await expect(column).toHaveValue('')
+  await expect(row).toHaveValue('')
+  await expect(page.getByTestId('movement-order')).toHaveText('Hold position')
+})
+
 test('abandon stops the encounter without inventing a combat result', async ({ page }) => {
   await open(page)
   await commitTo(page, 16, 10)
