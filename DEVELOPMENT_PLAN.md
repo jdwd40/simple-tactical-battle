@@ -36,9 +36,11 @@ The user's TSB-01 through TSB-52 work packages replace the earlier undispatched 
 | TSB-42 | Assistant Builder | Reproducible browser/headless complete-loop scenarios, including both post-destruction survivor cases. | TSB-40/41 integrated |
 | TSB-50 | UI Builder | Evidence-based readability/polish: battlefield first, restrained vector presentation, laptop layout, focus/keyboard, non-colour cues and reduced motion. Inspect the running UI. | Accepted M2; browser/playtest findings |
 | TSB-51 | General Builder | Reproduce and fix observed balance/AI defects within approved mechanics; record configuration changes and rationale. | Accepted M2; concrete review/batch/playtest findings |
-| TSB-52 | Assistant Builder | Targeted regressions, bounded batch harness, reproducible failure records and verified install/run/test/build/controls documentation. Owner defects return to General/UI. | M2; final verification after TSB-50/51 integrated |
+| TSB-52 | Assistant Builder | Targeted regressions, bounded batch harness, reproducible failure records and verified install/run/test/build/controls documentation. Owner defects return to General/UI. | Accepted engine/AI40 for independent52A headless tooling; complete M2 and50/51 for52B final instructions/regressions/delivery verification |
 
 TSB-30 is delivered as30A (conditional lasers/shared resources/damage and laser-only outcomes), then30B (plotted missiles, swept impacts, persistence and full ending/aftermath rules). Each receives independent review before integration. TSB-31 remains one UI/application assignment, pausing at clean checkpoints for lead-controlled accepted engine handoffs; its final acceptance uses30B. This refines the existing work package without adding scope.
+
+TSB-52 is delivered as52A bounded headless tooling after accepted engine/AI40, then52B final regressions and verified delivery instructions after the complete duel and polish.52A can run independently alongside41 and supplies reproducible evidence for51; it does not accept the browser milestone or change game rules. Each increment receives independent review.
 
 ## First small batch after approval
 
