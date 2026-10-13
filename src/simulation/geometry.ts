@@ -22,6 +22,12 @@ export function distanceUnits(a: Position, b: Position): number {
   const root = floorSqrt(squared)
   return squared - root * root > root ? root + 1 : root
 }
+/** Exact inclusive range test in integer units (no square-root rounding). */
+export function withinRange(a: Position, b: Position, rangeUnits: number): boolean {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  return dx * dx + dy * dy <= rangeUnits * rangeUnits
+}
 export function samePosition(a: Position, b: Position): boolean {
   return a.x === b.x && a.y === b.y
 }

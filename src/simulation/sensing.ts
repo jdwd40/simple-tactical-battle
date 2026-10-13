@@ -1,6 +1,6 @@
 import type { PrivateKnowledge, ShipState } from '../contracts/private'
 import type { ContactMemory, Position, PublicMap, Ruleset, Tick } from '../contracts/public'
-import { ceilSqrt, hasLineOfSight } from './geometry'
+import { ceilSqrt, hasLineOfSight, withinRange } from './geometry'
 
 export interface FundingWants { readonly cloak: boolean; readonly pulse: boolean; readonly propulsion: boolean }
 export interface FundingGrant { readonly energyMilli: number; readonly cloakPaid: boolean; readonly pulsePaid: boolean; readonly propulsionPaid: boolean }
@@ -37,9 +37,7 @@ export function signatureRangeUnits(target: ShipState, moved: boolean, observerT
 export function detects(observer: ShipState, target: ShipState, targetMoved: boolean, rules: Ruleset, map: PublicMap, now: Tick): boolean {
   if (!observer.alive || !target.alive) return false
   const range = signatureRangeUnits(target, targetMoved, observer.trackingUntilTick > now, rules, now)
-  const dx = target.position.x - observer.position.x
-  const dy = target.position.y - observer.position.y
-  return dx * dx + dy * dy <= range * range && hasLineOfSight(observer.position, target.position, map, rules)
+  return withinRange(observer.position, target.position, range) && hasLineOfSight(observer.position, target.position, map, rules)
 }
 
 export type ContactEvent =
@@ -111,4 +109,12 @@ export function updateContacts(
     events.push({ kind: 'contact-acquired', contact })
   }
   return { knowledge: { ...knowledge, contacts, nextContactAlias }, events }
+}
+
+/** Stage 7: the observer saw this entity in the tick it was destroyed. Memory is kept, never deleted. */
+export function recordObservedDestruction(knowledge: PrivateKnowledge, entityId: string, now: Tick): PrivateKnowledge {
+  return {
+    ...knowledge, observedOpponentDestructionTick: now,
+    contacts: knowledge.contacts.map((entry) => (entry.entityId === entityId ? { entityId, contact: { ...entry.contact, observedDestructionTick: now } } : entry)),
+  }
 }

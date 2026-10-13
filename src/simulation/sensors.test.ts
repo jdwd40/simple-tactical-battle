@@ -7,7 +7,7 @@ import { createRuleset, DUEL_CONFIG } from '../scenarios/rules'
 import { initialiseSession, observeSide, previewRoute, resolveTurn, validateOrders } from './index'
 import { resolveTurnInOrder } from './resolve'
 import { detects } from './sensing'
-import { lock, orders } from './testSupport'
+import { lock, orders, withShip } from './testSupport'
 
 // Reproducible inputs: seed 20, DUEL_SCENARIO spawns (3,10)/(16,10), positions on the asteroid-free row y=10,500.
 const SEED = 20
@@ -15,8 +15,6 @@ const HIDDEN_KEYS = ['entityId', 'targetEntityId', 'cloakLatch', 'cloakActive', 
 const pulse = (turnIndex: number, cloak = false): TurnOrders => orders(turnIndex, null, cloak, 'activePulse')
 const hold = (turnIndex: number, cloak = false): TurnOrders => orders(turnIndex, null, cloak)
 
-const withShip = (state: SimulationState, side: Side, patch: Partial<ShipState>): SimulationState =>
-  ({ ...state, ships: { ...state.ships, [side]: { ...state.ships[side], ...patch } } })
 /** Uncloaked player at cell (6,10): exactly 10 cells from the patrol spawn. */
 function tenCellsApart(rules: Ruleset = DUEL_RULES): SimulationState {
   return withShip(initialiseSession(DUEL_SCENARIO, rules, SEED), 'player', { position: { x: 6500, y: 10_500 }, cloakRequested: false, cloakActive: false })

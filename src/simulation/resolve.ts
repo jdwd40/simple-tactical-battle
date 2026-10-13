@@ -2,7 +2,7 @@ import type {
   AcceptedTurn, InternalEvent, PrivateKnowledge, ResolveTurn, Scenario, ShipState, SimulationState, TurnPresentation, TurnResolution,
 } from '../contracts/private'
 import type {
-  InterruptionReason, OwnAssessment, OwnInterruption, PublicMap, PublicReplayFrame, Ruleset, Side, Tick, TurnOrders, VisibleEvent,
+  InterruptionReason, Outcome, OwnAssessment, OwnInterruption, PublicMap, PublicReplayFrame, Ruleset, Side, Tick, TurnOrders, UnfiredReason, VisibleEvent,
 } from '../contracts/public'
 import { freezeData } from '../scenarios/freeze'
 import { cellCentre } from '../scenarios/geometry'
@@ -10,8 +10,9 @@ import { publicScenario } from '../scenarios/private'
 import { samePosition } from './geometry'
 import { assertSessionMatches, cloakObservation, observeSide, projectObservation } from './observation'
 import { advanceRoute, idleRoute, planMovement, routeHeading, routePosition } from './route'
-import { detects, fundTick, updateContacts } from './sensing'
+import { detects, fundTick, recordObservedDestruction, updateContacts } from './sensing'
 import { validateOrders } from './validation'
+import { applyDamage, classifyOutcome, dischargeLaser, proposeLaser, UNFIRED_ORDER, withActivity } from './weapons'
 
 /** Canonical serialization order. It is never combat initiative. */
 export const SIDES: readonly Side[] = ['player', 'patrol']
@@ -71,17 +72,13 @@ function fundShip(ship: ShipState, rules: Ruleset, now: Tick): Funded {
   if (pulseDue && !grant.pulsePaid) interruptions.push('pulse-unfunded')
   const propulsionFailed = wantsPropulsion && !grant.propulsionPaid
   if (propulsionFailed && !ship.propulsionInterrupted) interruptions.push('propulsion-unfunded')
-  let cloakLatch = ship.cloakLatch
-  if (cloakFailed) cloakLatch = 'unfunded'
-  else if (grant.pulsePaid && cloakLatch === 'none') cloakLatch = 'activity'
-  const timing = rules.timing
+  const paid: ShipState = {
+    ...ship, energyMilli: grant.energyMilli, cloakActive: grant.cloakPaid, cloakLatch: cloakFailed ? 'unfunded' : ship.cloakLatch,
+    pulseAttemptSpent: ship.pulseAttemptSpent || pulseDue, propulsionInterrupted: propulsionFailed,
+    trackingUntilTick: grant.pulsePaid ? Math.max(ship.trackingUntilTick, now + rules.timing.trackingTicks) : ship.trackingUntilTick,
+  }
   return {
-    ship: {
-      ...ship, energyMilli: grant.energyMilli, cloakActive: grant.cloakPaid && !grant.pulsePaid, cloakLatch,
-      pulseAttemptSpent: ship.pulseAttemptSpent || pulseDue, propulsionInterrupted: propulsionFailed,
-      trackingUntilTick: grant.pulsePaid ? Math.max(ship.trackingUntilTick, now + timing.trackingTicks) : ship.trackingUntilTick,
-      exposureUntilTick: grant.pulsePaid ? Math.max(ship.exposureUntilTick, now + timing.exposureTicks) : ship.exposureUntilTick,
-    },
+    ship: grant.pulsePaid ? withActivity(paid, now, rules) : paid,
     propulsionPaid: grant.propulsionPaid, pulse: pulseDue ? (grant.pulsePaid ? 'succeeded' : 'failed') : null, interruptions,
   }
 }
@@ -97,8 +94,16 @@ function moveShip(ship: ShipState, propulsionPaid: boolean, rules: Ruleset): Shi
   }
 }
 
+interface LaserRecord { firedTick: Tick | null; readonly reasons: Set<UnfiredReason> }
+
+function weaponAttempt(startShip: ShipState, laser: LaserRecord): OwnAssessment['weaponAttempt'] {
+  if (startShip.orders?.weapon.kind !== 'laser') return { kind: 'not-requested' }
+  if (laser.firedTick !== null) return { kind: 'fired', tick: laser.firedTick, weapon: 'laser' }
+  return { kind: 'unfired', weapon: 'laser', reasons: UNFIRED_ORDER.filter((reason) => laser.reasons.has(reason)) }
+}
+
 function assess(
-  startShip: ShipState, endShip: ShipState, turnIndex: number, endTick: Tick, rules: Ruleset, pulse: PulseOutcome,
+  startShip: ShipState, endShip: ShipState, turnIndex: number, endTick: Tick, rules: Ruleset, pulse: PulseOutcome, laser: LaserRecord,
   interruptions: readonly OwnInterruption[], events: readonly VisibleEvent[], knowledge: PrivateKnowledge,
 ): OwnAssessment {
   const destination = endShip.destination
@@ -114,8 +119,7 @@ function assess(
     },
     interruptions: interruptions.map((interruption) => ({ ...interruption })),
     sensorAttempt: pulse === null ? { kind: 'not-requested' } : pulse === 'succeeded' ? { kind: 'succeeded' } : { kind: 'failed', reason: 'insufficient-energy' },
-    // Weapon intents are rejected at validation until TSB-30.
-    weaponAttempt: { kind: 'not-requested' },
+    weaponAttempt: weaponAttempt(startShip, laser),
     contacts: knowledge.contacts.map(({ contact }) => structuredClone(contact)),
     events: [...events], ordnancePending: null,
   }
@@ -141,10 +145,12 @@ export function resolveTurnInOrder(
   let knowledge = bySide(order, (side) => structuredClone(state.knowledge[side]))
   const interruptions = bySide(order, (): OwnInterruption[] => [])
   const pulses = bySide(order, (): { outcome: PulseOutcome } => ({ outcome: null }))
+  const lasers = bySide(order, (): LaserRecord => ({ firedTick: null, reasons: new Set() }))
+  let outcome: Outcome | null = null
   const turnEvents = bySide(order, (): VisibleEvent[] => [])
   const internalEvents: InternalEvent[] = []
   const project = (side: Side, tick: Tick, events: readonly VisibleEvent[]) => projectObservation({
-    side, turnIndex: lockedTurn.turnIndex, tick, map, ship: ships[side], knowledge: knowledge[side], outcome: state.outcome,
+    side, turnIndex: lockedTurn.turnIndex, tick, map, ship: ships[side], knowledge: knowledge[side], outcome: outcome === null ? null : { outcome, revealTick: endTick },
   }, rules, events, interruptions[side])
   const frames = bySide(order, (side): PublicReplayFrame[] => [{ tick: startTick, observation: project(side, startTick, []), events: [] }])
 
@@ -157,15 +163,34 @@ export function resolveTurnInOrder(
     ships = bySide(order, (side) => moveShip(funded[side].ship, funded[side].propulsionPaid, rules))
     const moved = bySide(order, (side) => !samePosition(before[side].position, ships[side].position))
     // Stage 4: pre-fire sensing from the moved state with this tick's tracking/exposure clocks.
-    // Stages 5–6 (weapons/projectiles) arrive in TSB-30.
+    const preFire = bySide(order, (side) => detects(ships[side], ships[opponent(side)], moved[opponent(side)], rules, map, now))
+    // Stage 5: every unspent intent against the same pre-damage snapshot and its own fresh sightings.
+    const snapshot = ships
+    const proposals = bySide(order, (side) => proposeLaser(snapshot[side], knowledge[side], preFire[side] ? [snapshot[opponent(side)]] : [], now, rules, map))
+    const fired = bySide(order, (side) => {
+      const proposal = proposals[side]
+      return proposal !== null && proposal.fire ? proposal.target : null
+    })
+    const armed = bySide(order, (side) => (fired[side] === null ? snapshot[side] : dischargeLaser(snapshot[side], now, rules)))
+    // Stage 6: one damage batch built from the pre-damage alive set; enumeration cannot cancel a shot.
+    const shooters = (ship: ShipState) => SIDES.filter((side) => fired[side]?.entityId === ship.entityId)
+    const hits = bySide(order, (side) => applyDamage(armed[side], shooters(armed[side]).length * rules.laser.damage, now))
+    // Stage 7: emissions are sensed against the pre-damage state (no second weapon pass this tick)
+    // and coalesce with pre-fire sightings into one measurement per tick.
     const sightings = bySide(order, (side) => {
-      const target = ships[opponent(side)]
-      return detects(ships[side], target, moved[opponent(side)], rules, map, now)
+      const target = armed[opponent(side)]
+      return preFire[side] || detects(armed[side], target, moved[opponent(side)], rules, map, now)
         ? [{ entityId: target.entityId, position: target.position }] : []
     })
-    // Stage 7: one knowledge update per side, filtered events and recorded frames.
-    const updates = bySide(order, (side) => updateContacts(knowledge[side], sightings[side], now, rules, map))
+    ships = bySide(order, (side) => hits[side].ship)
+    const updates = bySide(order, (side) => {
+      const update = updateContacts(knowledge[side], sightings[side], now, rules, map)
+      const target = sightings[side][0]
+      return target !== undefined && hits[opponent(side)].destroyed
+        ? { ...update, knowledge: recordObservedDestruction(update.knowledge, target.entityId, now) } : update
+    })
     knowledge = bySide(order, (side) => updates[side].knowledge)
+    if (now === endTick) outcome = classifyOutcome(ships, 0)
     const internal: Body<InternalEvent>[] = []
     for (const side of SIDES) {
       const ship = ships[side]
@@ -181,6 +206,18 @@ export function resolveTurnInOrder(
         visible.push({ kind: 'own-interruption', reason })
         internal.push({ kind: 'interruption', entityId: ship.entityId, reason })
       }
+      const proposal = proposals[side]
+      if (proposal?.fire === false) for (const reason of proposal.reasons) lasers[side].reasons.add(reason)
+      const target = fired[side]
+      const weapon = snapshot[side].orders?.weapon
+      if (target !== null && weapon?.kind === 'laser') {
+        lasers[side].firedTick = now
+        const position = { ...armed[side].position }
+        visible.push({ kind: 'own-shot', position, weapon: { kind: 'laser', contactAlias: weapon.contactAlias } })
+        visible.push({ kind: 'own-energy', deltaMilli: -rules.laser.costMilli, reason: 'laser' })
+        internal.push({ kind: 'shot', entityId: ship.entityId, weapon: 'laser', targetEntityId: target.entityId, position })
+        internal.push({ kind: 'resource', entityId: ship.entityId, energyDeltaMilli: -rules.laser.costMilli, ammunitionDelta: 0, reason: 'laser' })
+      }
       const cloakBefore = cloakObservation(before[side], tick)
       const cloakAfter = cloakObservation(ship, now)
       if (cloakBefore.state !== cloakAfter.state || cloakBefore.actual !== cloakAfter.actual) {
@@ -194,10 +231,35 @@ export function resolveTurnInOrder(
           internal.push({ kind: 'detection', observer: side, entityId: ships[opponent(side)].entityId, position: event.contact.measurement.position })
         }
       }
+      // Observed consequences: built only from this side's own sightings and aliases.
+      const enemy = armed[opponent(side)]
+      const seenAlias = sightings[side].length === 0 ? undefined
+        : knowledge[side].contacts.find((entry) => entry.entityId === enemy.entityId)?.contact.alias
+      if (fired[opponent(side)] !== null && seenAlias !== undefined) {
+        visible.push({ kind: 'observed-shot', sourceAlias: seenAlias, position: { ...enemy.position }, weapon: 'laser' })
+      }
+      if (target !== null && seenAlias !== undefined) {
+        visible.push({ kind: 'observed-impact', position: { ...target.position }, weapon: 'laser', contactAlias: seenAlias })
+      }
+      const hit = hits[side]
+      if (hit.shieldsLost + hit.hullLost > 0) {
+        visible.push({ kind: 'own-damage', shieldsLost: hit.shieldsLost, hullLost: hit.hullLost })
+        internal.push({ kind: 'damage', targetEntityId: ship.entityId, sourceIds: shooters(armed[side]).map((s) => snapshot[s].entityId), shieldsLost: hit.shieldsLost, hullLost: hit.hullLost })
+      }
+      if (hits[opponent(side)].destroyed && seenAlias !== undefined) {
+        visible.push({ kind: 'observed-destruction', contactAlias: seenAlias, position: { ...enemy.position } })
+      }
+      if (hit.destroyed) {
+        if (weapon?.kind === 'laser' && lasers[side].firedTick === null) lasers[side].reasons.add('own-destroyed')
+        visible.push({ kind: 'own-destruction', position: { ...ship.position } })
+        internal.push({ kind: 'destruction', entityId: ship.entityId, position: { ...ship.position } })
+      }
+      if (now === endTick && outcome !== null) visible.push({ kind: 'outcome', outcome })
       const events = visible.map((body, index) => ({ ...body, id: eventId(now, index), tick: now }) as VisibleEvent)
       turnEvents[side].push(...events)
       frames[side].push({ tick: now, observation: project(side, now, events), events })
     }
+    if (now === endTick && outcome !== null) internal.push({ kind: 'outcome', outcome })
     internalEvents.push(...internal.map((body, index) => ({ ...body, id: eventId(now, index), tick: now }) as InternalEvent))
   }
 
@@ -206,11 +268,11 @@ export function resolveTurnInOrder(
     random: structuredClone(state.random), tick: endTick, turnIndex: state.turnIndex + 1,
     ships, missiles: [], knowledge, plannerMemory: structuredClone(state.plannerMemory),
     acceptedTurns: [...structuredClone(state.acceptedTurns), lockedTurn],
-    terminalPending: state.terminalPending, outcome: null,
+    terminalPending: state.terminalPending, outcome: outcome === null ? null : { outcome, revealTick: endTick },
   }
   const presentations = bySide(order, (side): TurnPresentation => ({
     side, startTick, endTick, automatic: lockedTurn.automatic, frames: frames[side],
-    assessment: assess(startShips[side], ships[side], lockedTurn.turnIndex, endTick, rules, pulses[side].outcome, interruptions[side], turnEvents[side], knowledge[side]),
+    assessment: assess(startShips[side], ships[side], lockedTurn.turnIndex, endTick, rules, pulses[side].outcome, lasers[side], interruptions[side], turnEvents[side], knowledge[side]),
   }))
   return freezeData({ locked: lockedTurn, nextState, internalEvents, presentations })
 }
