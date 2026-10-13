@@ -6,7 +6,7 @@ Canonical: /home/jd/projects/tactical-space-battle/PROJECT_STATUS.md. Sole write
 
 The user approved automated implementation through M3's local release candidate on 2026-10-12: "plan is aproved. All systems go. Run automated as much as possible from now on". Local commits, integration, tests and corrections are authorised. No default/release-branch merge, remote push or public deployment is authorised.
 
-Repository /home/jd/projects/tactical-space-battle, local branch tsb/integration, no remote. Accepted source f39013a734b3a1b074bf0cf6f0f2701af2d4ecdb (AI51 corrections, main41 and tooling52A); documentation checkpoints follow. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e.
+Repository /home/jd/projects/tactical-space-battle, local branch tsb/integration, no remote. Accepted source 13521ac8689750c178ad657368490f4ca7de0d77 (42 encounter regressions, AI51 corrections, main41 and tooling52A); documentation checkpoints follow. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e.
 
 M0 COMPLETE: approved rules/contracts, runnable scaffold, public initial scenario and reviewed console. Combined build/typecheck/lint, 57 unit tests and 7 Chromium tests passed at b71fe73. This was startup, not gameplay.
 
@@ -16,7 +16,7 @@ M2A COMPLETE atc279edb: sensors/stealth20, real UI21 and information regressions
 
 M2B COMPLETE at088a522: both weapons/resources, shield/hull damage, swept projectile/obstacle behavior, cross-turn/launcher-death persistence, simultaneous destruction and observer-safe outcomes. Tasks30A/30B/31/32 independently PASS and integrated. Combined build/typecheck/lint,274unit/31files and36Chromium tests passed at4391 with one worker/no reuse. Reviewer31 also checked the production interface and four real-engine automatic-aftermath/re-entrant restart/abandon probes.
 
-Current M2C acceptance: complete real-AI browser duel, survivor evasion/automatic aftermath, faithful replay and reproducible restart.40/41 PASS/integrated;301unit/35files/build/type/lint PASS at8711dc7. Browser38PASS/1environmentfailure: lead status edit caused Vite page reload; UI50 reproduced tracked-Markdown reload, frozen verification/8711dc7 focused mission rerun PASS. No production restart bug.42 delivered realAI aftermath/repeated-encounter tests, independent review next.51 PASS/integratedf39013a; combined checks after42/50. Human feedback requires clearer combat feedback, full phone playability and stronger visual presentation in50; M3 acceptance waits for those changes.
+Current M2C acceptance: complete real-AI browser duel, survivor evasion/automatic aftermath, faithful replay and reproducible restart.40/41/42 PASS/integrated;301unit/35files/build/type/lint PASS at8711dc7. Browser38PASS/1environmentfailure: lead status edit caused Vite page reload; UI50 reproduced tracked-Markdown reload, frozen verification/8711dc7 focused mission rerun PASS. No production restart bug.42 independently passed305unit/4browser and3additional aftermath probes, integrated13521ac.51 PASS/integratedf39013a; combined checks after50. Human feedback requires clearer combat feedback, full phone playability and stronger visual presentation in50; M3 acceptance waits for those changes.
 
 ## Confirmed factory mapping and recovery
 
@@ -27,8 +27,8 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
 | General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | Available;51 PASS/integrated; further exploration stopped |
 | UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-50 /1 active, expanded user feedback; rebased onto accepted51 |
-| Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | Available;42 /1 delivered after granted browser checks |
-| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | Available;51 PASS collected;42 next |
+| Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | Available;42 PASS/integrated;52B follows accepted50 |
+| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | Available;42 round0 PASS collected;50 next |
 
 Earlier outages: Herdr stopped at 22:58:38 UTC Oct12 and 05:21 UTC Oct13. User established kernel OOM killed headless Chrome, then systemd OOMPolicy=stop ended the scope. User added 4G swap and moved Herdr to herdr.service with OOMPolicy=continue; infrastructure investigation ended. General moved p3→p8 and Assistant p6→p9; original sessions restored, existing /home/jd trust confirmations explicitly authorised and cleared. Reviewer/Assistant native resume had lost their original full-access policy; the same UUIDs were resumed with their recorded original permissions, without model changes. Reviewer browser access subsequently passed. Interrupted REVIEW-TSB-11B /2/round1 was re-run and accepted. No current recovery blocker.
 
@@ -58,8 +58,8 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-32 Assistant /1 | assistant-32 / tsb/32-combat-regressions / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 |38fb1cd46cba8fd1cbda44fec2288b965ba86f50 round0 PASS; integratedfbac43a; combined248unit/build/type/lint pass; independentnegativeblindholdcontrol and reproducibleinputs verified |
 | TSB-40 General /1 | general-40 / tsb/40-opponent / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | b0e2b7ae92ccf5e30657d5bc8fc04628210085d0 round0 PASS; integratedc4fb6c7;255unit/29files,14AItests/9boundedencounters and4independent public-boundary/navigation/resource probes PASS |
 | TSB-41 UI /1 | ui-41 / tsb/41-mission-flow / c4fb6c7477762e31ef47cb0d157158b10b9b0987 | 7f6aa01c33b08ad401e92a391a4476a97e1b8d1e round0 PASS; integrated8711dc7;291unit/34files/39browser/production independently PASS; one low clipboardfocus issue routed50 |
-| TSB-42 Assistant /1 | assistant-42 / tsb/42-encounter-tests / 8711dc703c8d87db225906bb29ef6138c4b1db43 | Delivered00c744cbe632d6e08ac1403fff212506fecd60d5;4focused/305fullunit and4browser4273 PASS; actual ending/reset screenshots inspected; review next |
-| TSB-50 UI /1 | ui-50 / tsb/50-tactical-polish / original8711dc7; revisedbasef39013a734b3a1b074bf0cf6f0f2701af2d4ecdb | Clean checkpointaabf1de preservedtsb/50-pre51-checkpoint; rebaseda614c4e6abff8bc1d8a756556308c6b639cd6369; original306unit/build/type/lint PASS. Expanded mobile/combat/visual requirements active; final browser/review pending |
+| TSB-42 Assistant /1 | assistant-42 / tsb/42-encounter-tests / 8711dc703c8d87db225906bb29ef6138c4b1db43 | Delivered00c744cbe632d6e08ac1403fff212506fecd60d5; round0 PASS; integrated13521ac;4focused/305fullunit,4browser and3independent aftermath probes PASS; actual ending/reset screenshots inspected |
+| TSB-50 UI /1 | ui-50 / tsb/50-tactical-polish / original8711dc7; revisedbasef39013a734b3a1b074bf0cf6f0f2701af2d4ecdb | Clean checkpointaabf1de preservedtsb/50-pre51-checkpoint; rebaseda614c4e6abff8bc1d8a756556308c6b639cd6369; expanded checkpoint8079876.326unit/build/type/lint PASS. Browser4272 granted13:07UTC; new mobile/labels checks found failures, builder diagnosing; final delivery/review pending |
 | TSB-51 General /1 | general-51 / tsb/51-ai-balance / 4ffd1a287d00ac67c84cee4427a359d91f3f25c4 | 310983a8f5c6579372107a32c5bea009e7e4bb5b round0 PASS; integratedd162f8d/f39013a;311unit/36files and4independentprobes PASS; no rule-number changes |
 | TSB-52A Assistant /1 | assistant-52a / tsb/52a-batch / 667b829fce9f012bba0db01b04f7545fdba78123 | 0fd7b15efc3ea8005f4b651b3a928e120194e03e round0 PASS; integrated559cd53/4ffd1a2;298unit/34files/tool/build/type/lint PASS;4independentautomatic/failure/replay probes PASS;20runs zero invalidity,20exactreplays |
 
@@ -87,9 +87,9 @@ TSB-40 API connection failed mid-response around10:32UTC; no completed delivery 
 
 Recovery at11:09UTC confirmed integrationc4fb6c7 clean; all retained builder/review worktrees clean except active41 edits. Original role/pane identities unchanged; no conflicting edits or duplicated assignments. AI integration build/typecheck/lint and288unit/33files PASS; durable logs under /home/jd/projects/tactical-space-battle-worktrees/handoffs/combined-c4fb6c7. Prior M2B browser result is preserved; no duplicate browser run is needed before41.
 
-Next: independent42 review/integration, complete expanded50 mobile/combat clarity/visual polish, then52B verified delivery instructions and final combined release-candidate review/checks on immutable snapshots.51 correction accepted, tuning numbers unchanged. Existing observer events suffice for hit/damage feedback; no contract redesign required. User human acceptance remains unmet/pending updated preview. Original sessions/assignments preserved; sole backlog DEVELOPMENT_PLAN.md.
+Next: complete expanded50 mobile/combat clarity/visual polish and independent review/integration, then52B verified delivery instructions and final combined release-candidate review/checks on immutable snapshots.42 review accepted/integrated;51 correction accepted, tuning numbers unchanged. Existing observer events suffice for hit/damage feedback; no contract redesign required. User human acceptance remains unmet/pending updated preview. Original sessions/assignments preserved; sole backlog DEVELOPMENT_PLAN.md.
 
-State: IMPLEMENTED / REVIEWED / INTEGRATED M0,M1,M2A,M2B and main41/AI40,51/tooling52A. M2C final42 acceptance pending; M3 UI/user feedback/delivery active. READY_TO_MERGE no; DEPLOYED no. Do not add expansion features.
+State: IMPLEMENTED / REVIEWED / INTEGRATED M0,M1,M2A,M2B and main41/AI40,51/tooling52A/encounter42. Combined M2C/M3 acceptance after50 remains pending; M3 UI/user feedback/delivery active. READY_TO_MERGE no; DEPLOYED no. Do not add expansion features.
 
 AI heuristic accepted: prefer laser intents within range+1cell and missiles farther out, without changing weapon legality/stats. All9simpleplayer scripts lost and no missile was selected in those9runs; unitmissilechoices verified, balance/human assessment remains51/M3, no enjoyment claim.
 
