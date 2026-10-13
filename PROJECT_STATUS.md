@@ -16,7 +16,7 @@ M2A COMPLETE atc279edb: sensors/stealth20, real UI21 and information regressions
 
 M2B COMPLETE at088a522: both weapons/resources, shield/hull damage, swept projectile/obstacle behavior, cross-turn/launcher-death persistence, simultaneous destruction and observer-safe outcomes. Tasks30A/30B/31/32 independently PASS and integrated. Combined build/typecheck/lint,274unit/31files and36Chromium tests passed at4391 with one worker/no reuse. Reviewer31 also checked the production interface and four real-engine automatic-aftermath/re-entrant restart/abandon probes.
 
-Current M2C acceptance: the complete browser mission against observation-only PATROL/INVESTIGATE/ENGAGE/SEARCH AI, survivor evasion while missiles remain, faithful replay and reproducible restart without terminal intervention or gameplay mocks. TSB-40 round0 PASS and integratedc4fb6c7. TSB-41 /1 active in its existing worktree; TSB-42 follows accepted41. Human gameplay acceptance remains pending and separate from technical completion.
+Current M2C acceptance: the complete browser mission against observation-only PATROL/INVESTIGATE/ENGAGE/SEARCH AI, survivor evasion while missiles remain, faithful replay and reproducible restart without terminal intervention or gameplay mocks. TSB-40 round0 PASS and integratedc4fb6c7. TSB-41 /1 delivered7f6aa01, review queued after52A; TSB-42 follows accepted41. Human gameplay acceptance remains pending and separate from technical completion.
 
 ## Confirmed factory mapping and recovery
 
@@ -26,7 +26,7 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | --- | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
 | General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | Available;40 /1 round0 PASS/integrated |
-| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-41 /1 active;31 PASS preserved |
+| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | Available;41 /1 delivered, review queued after52A |
 | Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | Available;52A /1 delivered for review |
 | Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | REVIEW-TSB-52A /1 round0 assigned |
 
@@ -57,7 +57,7 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-31 UI /1 | ui-31 / tsb/31-combat-ui / originalc279edb; reviewbase9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | Finalb4551055c2b45993f4007ead4131974db331f8a3 round0 PASS; integrated159916e/d0ad835/aa1dffc/088a522;267unit/36browser/production and4independentrealafterlife/reentrancyprobes pass; combined M2B274unit/36browser PASS |
 | TSB-32 Assistant /1 | assistant-32 / tsb/32-combat-regressions / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 |38fb1cd46cba8fd1cbda44fec2288b965ba86f50 round0 PASS; integratedfbac43a; combined248unit/build/type/lint pass; independentnegativeblindholdcontrol and reproducibleinputs verified |
 | TSB-40 General /1 | general-40 / tsb/40-opponent / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | b0e2b7ae92ccf5e30657d5bc8fc04628210085d0 round0 PASS; integratedc4fb6c7;255unit/29files,14AItests/9boundedencounters and4independent public-boundary/navigation/resource probes PASS |
-| TSB-41 UI /1 | ui-41 / tsb/41-mission-flow / c4fb6c7477762e31ef47cb0d157158b10b9b0987 | Active mission/real-AI composition, seed metadata and main browser flow; handoff TSB-41-a1.md |
+| TSB-41 UI /1 | ui-41 / tsb/41-mission-flow / c4fb6c7477762e31ef47cb0d157158b10b9b0987 | Delivered7f6aa01c33b08ad401e92a391a4476a97e1b8d1e;291unit/34files/39browser/build/type/lint/production PASS; round0 queued reviews/41-r0 after52A |
 | TSB-52A Assistant /1 | assistant-52a / tsb/52a-batch / 667b829fce9f012bba0db01b04f7545fdba78123 | Delivered0fd7b15efc3ea8005f4b651b3a928e120194e03e;298unit/34files/build/type/lint/tooltype PASS;20runs zero invalidity,20exactreplays; round0 assigned reviews/52a-r0 |
 
 Original assignments, reports and review verdicts: handoffs/. Exact detached snapshots: reviews/<task>-r<round>; Git worktree list records retained heads. TSB-11C report-a2/review-r1 documents the three corrected blockers: nested view immutability, re-entrant restart/abandon during commit, and blank grid fields after restart. No further review of that accepted change is pending.
