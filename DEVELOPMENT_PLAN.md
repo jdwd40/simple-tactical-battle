@@ -40,7 +40,7 @@ The user's TSB-01 through TSB-52 work packages replace the earlier undispatched 
 
 TSB-30 is delivered as30A (conditional lasers/shared resources/damage and laser-only outcomes), then30B (plotted missiles, swept impacts, persistence and full ending/aftermath rules). Each receives independent review before integration. TSB-31 remains one UI/application assignment, pausing at clean checkpoints for lead-controlled accepted engine handoffs; its final acceptance uses30B. This refines the existing work package without adding scope.
 
-TSB-52 is delivered as52A bounded headless tooling after accepted engine/AI40, then52B final regressions and verified delivery instructions after the complete duel and polish.52A can run independently alongside41 and supplies reproducible evidence for51; it does not accept the browser milestone or change game rules. Each increment receives independent review.
+TSB-52 is delivered as52A bounded headless tooling after accepted engine/AI40, then52B verified delivery instructions after the complete duel and polish.52B README preparation can overlap UI50 in an isolated checkout; its final verification and delivery require the lead's accepted50 source handoff. Already accepted42/52A regressions are reused without inventing additional tests.52A supplies reproducible evidence for51; it does not accept the browser milestone or change game rules. Each increment receives independent review.
 
 ## First small batch after approval
 
@@ -52,7 +52,7 @@ Each actual handoff supplies task/attempt, confirmed pane, absolute worktree/bra
 
 Shared contracts/scenario data belong to General; root configuration/lockfile belong to Assistant; application presentation/React/PixiJS belong to UI. Shared amendments and ownership transfers are sequenced by the lead. Assign finite test-server lifetimes and distinct ports at dispatch, and verify browser tests reach the assigned worktree/build. The lead owns combined integration and status, not substantive feature implementation; any lead code changes receive independent review.
 
-Demonstration gates: M0 launches; M1 demonstrates real movement/replay; M2A demonstrates search/concealment; M2B demonstrates scripted combat; M2C demonstrates the complete AI duel and requests human feedback. Preview forwarding/access is not established yet; a server-local URL alone is not a user-accessible demo. Interim scripted policies are labelled unfinished. Public hosting remains separately authorised.
+Demonstration gates: M0 launches; M1 demonstrates real movement/replay; M2A demonstrates search/concealment; M2B demonstrates scripted combat; M2C demonstrates the complete AI duel and requests human feedback. A private Tailscale preview is established; its current URL/revision and access limitations are recorded in PROJECT_STATUS.md. User feedback confirmed access and added full mobile playability, clear hit/damage feedback and stronger visuals to50. A server-local URL alone is not a user-accessible demo. Public hosting remains separately authorised.
 
 ## Verification matrix
 
