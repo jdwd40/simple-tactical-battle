@@ -50,23 +50,39 @@ function commitOrders(state: SimulationState, side: Side, orders: TurnOrders | n
   }
 }
 
-/** Stages 1–2: regeneration, then cloak sustain → propulsion grants. Interruptions once per transition. */
-function fundShip(ship: ShipState, rules: Ruleset, now: Tick): { ship: ShipState; propulsionPaid: boolean; interruptions: InterruptionReason[] } {
-  if (!ship.alive) return { ship, propulsionPaid: false, interruptions: [] }
+type PulseOutcome = 'succeeded' | 'failed' | null
+interface Funded { readonly ship: ShipState; readonly propulsionPaid: boolean; readonly pulse: PulseOutcome; readonly interruptions: InterruptionReason[] }
+
+/**
+ * Stages 1–2: clock expiry is the absolute `until > now` comparison, then regeneration and the
+ * cloak sustain → first-tick pulse → propulsion grants. The single pulse attempt is spent whether
+ * or not it is funded. A funded pulse starts tracking and exposure and latches cloak off for the
+ * rest of the turn (an already-paid sustain is not refunded). Interruptions once per transition.
+ */
+function fundShip(ship: ShipState, rules: Ruleset, now: Tick): Funded {
+  if (!ship.alive) return { ship, propulsionPaid: false, pulse: null, interruptions: [] }
   const sustainDue = ship.cloakRequested && ship.cloakLatch === 'none' && ship.exposureUntilTick <= now
+  const pulseDue = ship.orders?.sensor === 'activePulse' && !ship.pulseAttemptSpent
   const wantsPropulsion = ship.route.remainingDistanceUnits > 0
-  const grant = fundTick(ship.energyMilli, { cloak: sustainDue, propulsion: wantsPropulsion }, rules.ships[ship.shipClass])
+  const grant = fundTick(ship.energyMilli, { cloak: sustainDue, pulse: pulseDue, propulsion: wantsPropulsion }, rules.sensors.pulseCostMilli, rules.ships[ship.shipClass])
   const interruptions: InterruptionReason[] = []
   const cloakFailed = sustainDue && !grant.cloakPaid
   if (cloakFailed) interruptions.push('cloak-unfunded')
+  if (pulseDue && !grant.pulsePaid) interruptions.push('pulse-unfunded')
   const propulsionFailed = wantsPropulsion && !grant.propulsionPaid
   if (propulsionFailed && !ship.propulsionInterrupted) interruptions.push('propulsion-unfunded')
+  let cloakLatch = ship.cloakLatch
+  if (cloakFailed) cloakLatch = 'unfunded'
+  else if (grant.pulsePaid && cloakLatch === 'none') cloakLatch = 'activity'
+  const timing = rules.timing
   return {
     ship: {
-      ...ship, energyMilli: grant.energyMilli, cloakActive: grant.cloakPaid,
-      cloakLatch: cloakFailed ? 'unfunded' : ship.cloakLatch, propulsionInterrupted: propulsionFailed,
+      ...ship, energyMilli: grant.energyMilli, cloakActive: grant.cloakPaid && !grant.pulsePaid, cloakLatch,
+      pulseAttemptSpent: ship.pulseAttemptSpent || pulseDue, propulsionInterrupted: propulsionFailed,
+      trackingUntilTick: grant.pulsePaid ? Math.max(ship.trackingUntilTick, now + timing.trackingTicks) : ship.trackingUntilTick,
+      exposureUntilTick: grant.pulsePaid ? Math.max(ship.exposureUntilTick, now + timing.exposureTicks) : ship.exposureUntilTick,
     },
-    propulsionPaid: grant.propulsionPaid, interruptions,
+    propulsionPaid: grant.propulsionPaid, pulse: pulseDue ? (grant.pulsePaid ? 'succeeded' : 'failed') : null, interruptions,
   }
 }
 
@@ -82,7 +98,7 @@ function moveShip(ship: ShipState, propulsionPaid: boolean, rules: Ruleset): Shi
 }
 
 function assess(
-  startShip: ShipState, endShip: ShipState, turnIndex: number, endTick: Tick, rules: Ruleset,
+  startShip: ShipState, endShip: ShipState, turnIndex: number, endTick: Tick, rules: Ruleset, pulse: PulseOutcome,
   interruptions: readonly OwnInterruption[], events: readonly VisibleEvent[], knowledge: PrivateKnowledge,
 ): OwnAssessment {
   const destination = endShip.destination
@@ -97,8 +113,9 @@ function assess(
       shields: endShip.shields - startShip.shields, ammunition: endShip.ammunition - startShip.ammunition,
     },
     interruptions: interruptions.map((interruption) => ({ ...interruption })),
-    // Pulse and weapon intents are rejected at validation in this increment, so none were requested.
-    sensorAttempt: { kind: 'not-requested' }, weaponAttempt: { kind: 'not-requested' },
+    sensorAttempt: pulse === null ? { kind: 'not-requested' } : pulse === 'succeeded' ? { kind: 'succeeded' } : { kind: 'failed', reason: 'insufficient-energy' },
+    // Weapon intents are rejected at validation until TSB-30.
+    weaponAttempt: { kind: 'not-requested' },
     contacts: knowledge.contacts.map(({ contact }) => structuredClone(contact)),
     events: [...events], ordnancePending: null,
   }
@@ -123,6 +140,7 @@ export function resolveTurnInOrder(
   let ships = startShips
   let knowledge = bySide(order, (side) => structuredClone(state.knowledge[side]))
   const interruptions = bySide(order, (): OwnInterruption[] => [])
+  const pulses = bySide(order, (): { outcome: PulseOutcome } => ({ outcome: null }))
   const turnEvents = bySide(order, (): VisibleEvent[] => [])
   const internalEvents: InternalEvent[] = []
   const project = (side: Side, tick: Tick, events: readonly VisibleEvent[]) => projectObservation({
@@ -133,12 +151,13 @@ export function resolveTurnInOrder(
   for (let tick = startTick; tick < endTick; tick++) {
     const now = tick + 1
     const before = ships
-    // Stages 1–2: clocks, regeneration and resource grants per ship.
+    // Stages 1–2: clocks, regeneration and resource grants (incl. the first-tick pulse) per ship.
     const funded = bySide(order, (side) => fundShip(before[side], rules, now))
     // Stage 3: both movements from the same prior snapshot, applied together.
     ships = bySide(order, (side) => moveShip(funded[side].ship, funded[side].propulsionPaid, rules))
     const moved = bySide(order, (side) => !samePosition(before[side].position, ships[side].position))
-    // Stage 4: pre-fire sensing from the moved state. Stages 5–6 (weapons/projectiles) arrive in TSB-30.
+    // Stage 4: pre-fire sensing from the moved state with this tick's tracking/exposure clocks.
+    // Stages 5–6 (weapons/projectiles) arrive in TSB-30.
     const sightings = bySide(order, (side) => {
       const target = ships[opponent(side)]
       return detects(ships[side], target, moved[opponent(side)], rules, map, now)
@@ -151,6 +170,12 @@ export function resolveTurnInOrder(
     for (const side of SIDES) {
       const ship = ships[side]
       const visible: Body<VisibleEvent>[] = []
+      if (funded[side].pulse !== null) pulses[side].outcome = funded[side].pulse
+      if (funded[side].pulse === 'succeeded') {
+        const deltaMilli = -rules.sensors.pulseCostMilli
+        visible.push({ kind: 'own-energy', deltaMilli, reason: 'pulse' })
+        internal.push({ kind: 'resource', entityId: ship.entityId, energyDeltaMilli: deltaMilli, ammunitionDelta: 0, reason: 'pulse' })
+      }
       for (const reason of funded[side].interruptions) {
         interruptions[side].push({ tick: now, reason })
         visible.push({ kind: 'own-interruption', reason })
@@ -185,7 +210,7 @@ export function resolveTurnInOrder(
   }
   const presentations = bySide(order, (side): TurnPresentation => ({
     side, startTick, endTick, automatic: lockedTurn.automatic, frames: frames[side],
-    assessment: assess(startShips[side], ships[side], lockedTurn.turnIndex, endTick, rules, interruptions[side], turnEvents[side], knowledge[side]),
+    assessment: assess(startShips[side], ships[side], lockedTurn.turnIndex, endTick, rules, pulses[side].outcome, interruptions[side], turnEvents[side], knowledge[side]),
   }))
   return freezeData({ locked: lockedTurn, nextState, internalEvents, presentations })
 }

@@ -2,18 +2,27 @@ import type { PrivateKnowledge, ShipState } from '../contracts/private'
 import type { ContactMemory, Position, PublicMap, Ruleset, Tick } from '../contracts/public'
 import { ceilSqrt, hasLineOfSight } from './geometry'
 
-/** Stages 1–2 energy for one living ship: regeneration (capped), then cloak sustain → propulsion. */
+export interface FundingWants { readonly cloak: boolean; readonly pulse: boolean; readonly propulsion: boolean }
+export interface FundingGrant { readonly energyMilli: number; readonly cloakPaid: boolean; readonly pulsePaid: boolean; readonly propulsionPaid: boolean }
+
+/**
+ * Stages 1–2 energy for one living ship: regeneration (capped), then the fixed grant priority
+ * cloak sustain → first-tick pulse → propulsion. Weapons (TSB-30) slot in last. Nothing goes negative.
+ */
 export function fundTick(
-  energyMilli: number, wants: { readonly cloak: boolean; readonly propulsion: boolean },
+  energyMilli: number, wants: FundingWants, pulseCostMilli: number,
   spec: { readonly maxEnergyMilli: number; readonly regenerationMilliPerTick: number; readonly cloakMilliPerTick: number; readonly propulsionMilliPerTick: number },
-): { readonly energyMilli: number; readonly cloakPaid: boolean; readonly propulsionPaid: boolean } {
+): FundingGrant {
   let energy = Math.min(spec.maxEnergyMilli, energyMilli + spec.regenerationMilliPerTick)
-  // Active pulse (TSB-20) and weapon (TSB-30) grants slot in after cloak/propulsion respectively.
-  const cloakPaid = wants.cloak && energy >= spec.cloakMilliPerTick
-  if (cloakPaid) energy -= spec.cloakMilliPerTick
-  const propulsionPaid = wants.propulsion && energy >= spec.propulsionMilliPerTick
-  if (propulsionPaid) energy -= spec.propulsionMilliPerTick
-  return { energyMilli: energy, cloakPaid, propulsionPaid }
+  const pay = (wanted: boolean, cost: number): boolean => {
+    if (!wanted || energy < cost) return false
+    energy -= cost
+    return true
+  }
+  const cloakPaid = pay(wants.cloak, spec.cloakMilliPerTick)
+  const pulsePaid = pay(wants.pulse, pulseCostMilli)
+  const propulsionPaid = pay(wants.propulsion, spec.propulsionMilliPerTick)
+  return { energyMilli: energy, cloakPaid, pulsePaid, propulsionPaid }
 }
 
 /** Detection threshold for a target at absolute tick `now`. */

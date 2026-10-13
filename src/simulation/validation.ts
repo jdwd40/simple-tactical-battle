@@ -9,7 +9,7 @@ import { fundTick } from './sensing'
  * Engine capabilities of this increment. Equipped but unimplemented intents are rejected
  * as `equipment-unavailable` rather than accepted and silently not performed.
  */
-export const ENGINE_CAPABILITIES = freezeData({ activePulse: false, laser: false, missile: false })
+export const ENGINE_CAPABILITIES = freezeData({ activePulse: true, laser: false, missile: false })
 
 type ErrorCode = Extract<ValidationIssue, { readonly severity: 'error' }>['code']
 function error(field: ValidationField, code: ErrorCode, details?: ValidationIssue['details']): ValidationIssue {
@@ -41,21 +41,29 @@ function shapeIssues(orders: unknown): ValidationIssue[] {
   return issues
 }
 
-/** Same stage order as the engine: does propulsion pause before this turn's movement completes? */
-function propulsionShortfall(own: OwnShipObservation, route: RouteProgress, cloak: boolean, tick: Tick, rules: Ruleset): boolean {
+interface FundingForecast { readonly pulseShortfall: { readonly availableEnergyMilli: number } | null; readonly propulsionPauses: boolean }
+
+/** Replays the engine's stage-2 grant order on own facts only: pulse outcome and propulsion pauses. */
+function forecastFunding(own: OwnShipObservation, route: RouteProgress, cloak: boolean, pulse: boolean, tick: Tick, rules: Ruleset): FundingForecast {
   const spec = rules.ships[own.shipClass]
   let energy = own.energy.currentMilli
   let remaining = route.remainingDistanceUnits
   let cloakDue = cloak
-  for (let now = tick + 1; now <= tick + rules.timing.turnTicks && remaining > 0; now++) {
+  let pulseShortfall: FundingForecast['pulseShortfall'] = null
+  for (let now = tick + 1; now <= tick + rules.timing.turnTicks && (remaining > 0 || now === tick + 1); now++) {
     const sustain = cloakDue && own.clocks.exposureUntilTick <= now
-    const grant = fundTick(energy, { cloak: sustain, propulsion: true }, spec)
-    if (sustain && !grant.cloakPaid) cloakDue = false
-    if (!grant.propulsionPaid) return true
+    const pulseDue = pulse && now === tick + 1
+    const grant = fundTick(energy, { cloak: sustain, pulse: pulseDue, propulsion: remaining > 0 }, rules.sensors.pulseCostMilli, spec)
+    if (pulseDue && !grant.pulsePaid) {
+      // Energy left for the pulse after regeneration and the higher-priority sustain grant.
+      pulseShortfall = { availableEnergyMilli: fundTick(energy, { cloak: sustain, pulse: false, propulsion: false }, 0, spec).energyMilli }
+    }
+    if ((sustain && !grant.cloakPaid) || grant.pulsePaid) cloakDue = false
+    if (remaining > 0 && !grant.propulsionPaid) return { pulseShortfall, propulsionPauses: true }
     energy = grant.energyMilli
-    remaining -= spec.speedUnitsPerTick
+    if (remaining > 0) remaining -= spec.speedUnitsPerTick
   }
-  return false
+  return { pulseShortfall, propulsionPauses: false }
 }
 
 /** Inputs are the order envelope, this side's observation and public rules only. */
@@ -73,15 +81,28 @@ export const validateOrders: ValidateOrders = (orders, observation, rules) => {
   if ('error' in plan && orders.movement.kind === 'destination') {
     issues.push(error('movement', plan.error, { cell: { column: orders.movement.cell.column, row: orders.movement.cell.row } }))
   }
-  if (orders.sensor === 'activePulse' && !(own.equipment.activeSensor && ENGINE_CAPABILITIES.activePulse)) {
-    issues.push(error('sensor', 'equipment-unavailable'))
-  }
+  const pulse = orders.sensor === 'activePulse'
+  const pulseAvailable = own.equipment.activeSensor && ENGINE_CAPABILITIES.activePulse
+  if (pulse && !pulseAvailable) issues.push(error('sensor', 'equipment-unavailable'))
   if (orders.cloak && !own.equipment.cloak) issues.push(error('cloak', 'equipment-unavailable'))
   if (orders.weapon.kind !== 'hold') {
     const equipped = orders.weapon.kind === 'laser' ? own.equipment.laser : own.equipment.missileLauncher
     if (!(equipped && ENGINE_CAPABILITIES[orders.weapon.kind])) issues.push(error('weapon', 'equipment-unavailable'))
   }
-  if (!('error' in plan) && propulsionShortfall(own, plan.route, orders.cloak && own.equipment.cloak, observation.tick, rules)) {
+  const cloak = orders.cloak && own.equipment.cloak
+  if (cloak && own.clocks.exposureUntilTick > observation.tick + 1) {
+    issues.push({ field: 'cloak', severity: 'conditional', code: 'cloak-exposure', details: { readyTick: own.clocks.exposureUntilTick } })
+  }
+  if (cloak && pulse && pulseAvailable) issues.push({ field: 'cloak', severity: 'warning', code: 'activity-breaks-cloak' })
+  // The pulse precedes propulsion, so an invalid destination does not change its forecast.
+  const forecast = forecastFunding(own, 'error' in plan ? own.route : plan.route, cloak, pulse && pulseAvailable, observation.tick, rules)
+  if (forecast.pulseShortfall !== null) {
+    issues.push({
+      field: 'sensor', severity: 'conditional', code: 'awaiting-energy',
+      details: { requiredEnergyMilli: rules.sensors.pulseCostMilli, availableEnergyMilli: forecast.pulseShortfall.availableEnergyMilli },
+    })
+  }
+  if (!('error' in plan) && forecast.propulsionPauses) {
     issues.push({ field: 'movement', severity: 'conditional', code: 'propulsion-funding', details: { availableEnergyMilli: own.energy.currentMilli } })
   }
   return result(issues)

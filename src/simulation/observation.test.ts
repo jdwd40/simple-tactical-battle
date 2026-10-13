@@ -111,8 +111,8 @@ describe('order validation (own observation and public rules only)', () => {
     expect(validateOrders(orders(0, { column: 1, row: 1 }), { ...observation, map: sealed }, DUEL_RULES).issues.map((issue) => issue.code)).toEqual(['unreachable'])
   })
   it('rejects equipped capabilities not implemented by this engine increment instead of silently ignoring them', () => {
-    expect(ENGINE_CAPABILITIES).toEqual({ activePulse: false, laser: false, missile: false })
-    expect(codes({ ...orders(0, null), sensor: 'activePulse' })).toEqual(['sensor:error:equipment-unavailable'])
+    expect(ENGINE_CAPABILITIES).toEqual({ activePulse: true, laser: false, missile: false })
+    expect(codes({ ...orders(0, null), sensor: 'activePulse' })).toEqual([])
     expect(codes({ ...orders(0, null), weapon: { kind: 'laser', contactAlias: 'contact-1' } })).toEqual(['weapon:error:equipment-unavailable'])
     expect(codes({ ...orders(0, null), weapon: { kind: 'missile', aim: { column: 9, row: 9 } } })).toEqual(['weapon:error:equipment-unavailable'])
     const patrol = observeSide(initialiseSession(DUEL_SCENARIO, DUEL_RULES, 7), 'patrol', DUEL_RULES, DUEL_SCENARIO)
