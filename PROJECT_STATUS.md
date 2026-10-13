@@ -4,9 +4,9 @@ Canonical: /home/jd/projects/tactical-space-battle/PROJECT_STATUS.md. Sole write
 
 ## Authority and current milestone
 
-The user approved automated implementation through M3's local release candidate on 2026-10-12: "plan is aproved. All systems go. Run automated as much as possible from now on". Local commits, integration, tests and corrections are authorised. No default/release-branch merge, remote push or public deployment is authorised.
+The user approved automated implementation through M3's local release candidate on 2026-10-12: "plan is aproved. All systems go. Run automated as much as possible from now on". On 2026-10-13 the user added: "commit and push this we'll have a rest after 7 hours grinding". Commit and push of the reviewed tsb/integration release are authorised; default/release-branch merges and public deployment remain separate actions. Factory development is on the requested break.
 
-Repository /home/jd/projects/tactical-space-battle, local branch tsb/integration, no remote. Accepted integrated source f34724a0f2e9ec2fb13e211851d66591b7507c6d (all scoped runtime, regression tooling and README). Independent combined RC technical PASS at this exact revision. A lead-only status metadata checkpoint follows; it changes no application source. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e.
+Repository /home/jd/projects/tactical-space-battle, branch tsb/integration. Origin https://github.com/jdwd40/tactical-space-battle.git is a new private repository in the signed-in jdwd40 account (no matching game remote existed). Accepted integrated application source f34724a0f2e9ec2fb13e211851d66591b7507c6d; independent combined RC technical PASS. Release/status checkpoint49b5b9b followed; only policy/rest records change now. Current checkpoint will be pushed and its remote tip verified. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e.
 
 M0 COMPLETE: approved rules/contracts, runnable scaffold, public initial scenario and reviewed console. Combined build/typecheck/lint, 57 unit tests and 7 Chromium tests passed at b71fe73. This was startup, not gameplay.
 
@@ -96,9 +96,9 @@ TSB-40 API connection failed mid-response around10:32UTC; no completed delivery 
 
 Recovery at11:09UTC confirmed integrationc4fb6c7 clean; all retained builder/review worktrees clean except active41 edits. Original role/pane identities unchanged; no conflicting edits or duplicated assignments. AI integration build/typecheck/lint and288unit/33files PASS; durable logs under /home/jd/projects/tactical-space-battle-worktrees/handoffs/combined-c4fb6c7. Prior M2B browser result is preserved; no duplicate browser run is needed before41.
 
-Next action: await user retest of updated preview (question sent2026-10-13 about hit clarity, phoneportrait/landscape and visual appeal/device/browser). All assignments/reviews complete; no active builder work or pending technical reviews. Route demonstrated defects to their existing owners under the same factory workflow; no invented expansion or ongoing background build phase. Merge/push/public deployment require explicit applicable permission and destination.
+Next action after the break: revalidate Git/Herdr states and collect the user retest of the updated preview (hit clarity, phoneportrait/landscape, visual appeal/device/browser). All assignments/reviews complete; no active builder work or pending technical reviews. No new build work during the break; private preview stays available. Route demonstrated defects to their existing owners under the same factory workflow. Push is now authorised; default/release-branch merge and public deployment require separate applicable permission.
 
-State: IMPLEMENTED yes; REVIEWED yes; INTEGRATED yes (exactf347 source). Local RELEASE CANDIDATE ready for human acceptance. READY_TO_MERGE held pending human acceptance/applicable merge approval; default/releasebranch not merged, no remote push. DEPLOYED no (private demonstration only). Current stopping point is the completed scoped technical release candidate.
+State: IMPLEMENTED yes; REVIEWED yes; INTEGRATED yes (exactf347 source). RELEASE CANDIDATE ready for human acceptance; authorised private remote push is being checkpointed. READY_TO_MERGE held pending human acceptance/applicable merge approval; no default/releasebranch merge. DEPLOYED no (private demonstration only). Factory on user-requested break; all workers idle, no pending reviews.
 
 AI heuristic accepted: prefer laser intents within range+1cell and missiles farther out, without changing weapon legality/stats. All9simpleplayer scripts lost and no missile was selected in those9runs; unitmissilechoices verified, balance/human assessment remains51/M3, no enjoyment claim.
 
