@@ -12,7 +12,7 @@ M0 COMPLETE: approved rules/contracts, runnable scaffold, public initial scenari
 
 M1 COMPLETE: real headless movement engine, PixiJS plot, application controller and complementary lifecycle regressions REVIEWED and INTEGRATED. Combined 850d987 build/typecheck/lint, 166 unit tests / 21 files and 24 Chromium tests passed on 2026-10-13 (browser4391, one worker/no reuse). Plot/commit/genuine 100-tick movement/playback/assessment, complete-result playback independence and fresh restart with cleared acquired/lost contact history verified. Prior fbea50e combined163unit/23browser also passed and was recovered after interruption without duplication.
 
-Current M2A: TSB-20 sensors/stealth engine PASS/integrated7a3c343; combined build/type/lint/180unit pass. UI21 awaits clean checkpoint for lead to bring this accepted engine into its checkout before real scan/browser acceptance. Assistant22 public-controller information regressions start from accepted20; UI21 still owns browser controls/tooltips/log inspection. Final M2A gate waits for both reviewed changes and combined browser checks. Combat, reactive AI and complete-duel outcomes remain M2B/C, followed by M3 release checks.
+Current M2A: TSB-20 sensors/stealth engine PASS/integrated7a3c343; combined build/type/lint/180unit pass. UI21 clean component checkpoint1b4b33c (194unit/26browser) collected; lead rebased it conflict-free onto accepted20 at7a3c343, new checkpoint53d8a4a. Same21/1 resumed for real scan/production/browser verification before review. Assistant22 public-controller information regressions start from accepted20; UI21 owns browser controls/tooltips/log inspection. Final M2A gate waits for both reviewed changes and combined browser checks. Combat, reactive AI and complete-duel outcomes remain M2B/C, followed by M3 release checks.
 
 ## Confirmed factory mapping and recovery
 
@@ -22,7 +22,7 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | --- | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
 | General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | Available; TSB-20 /1 PASS/integrated |
-| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-21 /1 active; component checkpoint before accepted20 binding |
+| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-21 /1 resumed on accepted20; final real-engine/browser verification |
 | Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | TSB-22 /1 active; bounded public information/replay regressions |
 | Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | Available; REVIEW-TSB-20 /1/round0 PASS |
 
@@ -46,7 +46,7 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-11C UI /1→2 | ui-11c / tsb/11c-playable / f4d77dc649497be98d63de63da4d06dd5e123be7 |0f8378d7 round0 CHANGES_REQUIRED3medium; corrected06601d1eca25977364e343a901984ae6d349f844 round1 PASS;163unit/23browser/build/type/lint/production independentlypass; integrated e33d043/fbea50e; combined 163unit/23browser/build/type/lint PASS |
 | TSB-12B Assistant /1 | assistant-12b / tsb/12b-lifecycle / fbea50ed56d6809fd06a91fd1343bb0a38016981 |1f70d8c0972ae0856c462768c3135ce912bb542b; round0 PASS; integrated850d987; combined166unit/24browser/build/type/lint PASS |
 | TSB-20 General /1 | general-20 / tsb/20-sensors / 850d98787ccd6fa32a2bc15bc481a2b976f29430 |85c8c510dec194e3807a8efcfaf3b474915c7281; round0 PASS; integrated7a3c343; combined180unit/build/type/lint pass;6835 independent assertions/23turns/3tick sizes |
-| TSB-21 UI /1 | ui-21 / tsb/21-sensors / 850d98787ccd6fa32a2bc15bc481a2b976f29430 | ACTIVE; sensor/cloak controls and contact feedback; clean checkpoint then accepted20 binding; handoff TSB-21-a1.md |
+| TSB-21 UI /1 | ui-21 / tsb/21-sensors / original850d987; reviewbase7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 | Checkpoint1b4b33c03337b8a019097ba3ee7f8d8728d884aa→rebased53d8a4a6dff567469b2455cce63a828438233ce8 on accepted20; resumed finalverification; no initialreview yet |
 | TSB-22 Assistant /1 | assistant-22 / tsb/22-information / 7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 | ACTIVE; new headless public-controller/replay/hidden-equivalence regressions; final M2A browser gate waits21 |
 
 Original assignments, reports and review verdicts: handoffs/. Exact detached snapshots: reviews/<task>-r<round>; Git worktree list records retained heads. TSB-11C report-a2/review-r1 documents the three corrected blockers: nested view immutability, re-entrant restart/abandon during commit, and blank grid fields after restart. No further review of that accepted change is pending.
@@ -67,6 +67,6 @@ Private production movement preview: http://100.109.154.60:5280/?seed=17 on the 
 
 Approved mechanics and numerical tuning hypotheses remain unchanged. Accepted refinements: stable getView/subscribe, encounter/revision identity, own route preview, cursor-prefix-only replay, controller-owned presentation clock, replay origin without future outcome, tick-only events with deduplicated prefixes. Latest player turn plus automatic aftermath is replay scope. See contracts/README.md and handoffs/TSB-02-ui-decisions.md.
 
-Next: collect General20 and review its exact snapshot; collect UI21 clean checkpoint, bring accepted20 integration into that checkout, then finish real-engine/browser review and combined verification. Release22 and continue30/31/32,40/41/42 and50/51/52 through the authorised release candidate. No implementation blocker or new approval needed within this scope. Model-capacity interruption delayed lead reporting; original combined M1 job completed successfully and existing worker sessions/assignments were preserved.
+Next: collect/review exact Assistant22 and UI21 final deliveries, integrate accepted changes and verify combined sensor interface; update private preview at M2A. Continue30/31/32,40/41/42 and50/51/52 through the authorised release candidate. No implementation blocker or new approval needed within this scope. Model-capacity interruption delayed lead reporting; original combined M1 job completed successfully and existing worker sessions/assignments were preserved.
 
 State: IMPLEMENTED / REVIEWED / INTEGRATED M0 and M1. M2A active. READY_TO_MERGE no; DEPLOYED no. At the complete-duel checkpoint request human playtest feedback and keep it separate from technical completion. Do not add expansion features.
