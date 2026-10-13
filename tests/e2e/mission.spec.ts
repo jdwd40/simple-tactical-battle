@@ -149,11 +149,30 @@ test('the full mission against the patrol AI: orders, combat, losing and regaini
       await expect.poll(async () => (await drawn(page)).tick, { timeout: 5000 }).toBeGreaterThanOrEqual(5)
       expect((await drawn(page)).transition).toBe('snap')
     }
+    if (number === 2) {
+      // The exchange at 101, cue by cue: nothing before it, everything that was observed at it.
+      await page.getByRole('button', { name: 'Pause' }).click()
+      await seek(page, 100)
+      await expect(page.getByTestId('combat-feed')).toBeEmpty()
+      expect((await drawn(page)).effects).toEqual([])
+      await seek(page, 101)
+      await expect(page.getByTestId('combat-feed')).toContainText('Laser hit contact-1.')
+      await expect(page.getByTestId('combat-feed')).toContainText('Hit: −35 shields (contact-1 fired its laser this tick).')
+      expect((await drawn(page)).effects).toEqual(expect.arrayContaining(['own-beam', 'hit-laser', 'hostile-beam', 'own-hit']))
+      await expect(page.getByRole('region', { name: 'Own ship', exact: true }).getByTestId('lost-shields')).toHaveText(' −35')
+      await expectReadableLabels(page, 'turn 2 exchange')
+      await page.screenshot({ path: testInfo.outputPath('mission-hit-exchange-1366x768.png') })
+      // Rewind clears the later cues again.
+      await seek(page, 100)
+      await expect(page.getByTestId('combat-feed')).toBeEmpty()
+    }
     if (number === HIDE_AND_SEEK.length) break
     await page.getByRole('button', { name: 'Skip to end' }).click()
     await expect(phase(page)).toHaveText('Assessment')
     if (number === 2) {
-      await expect(assessment(page)).toContainText('Laser fired at 0.1 s.')
+      // After Skip, the summary leads the assessment.
+      await expect(page.getByTestId('combat-summary')).toContainText('Laser hit contact-1.')
+      await expect(page.getByTestId('damage-taken')).toHaveText('✖ Damage taken: 35 shields, 0 hull')
       await expect(page.getByText('Hit: 35 shields and 0 hull lost.')).toBeVisible()
       await expectReadableLabels(page, 'turn 2 current contact')
       await page.screenshot({ path: testInfo.outputPath('mission-exchange-turn2-1366x768.png') })

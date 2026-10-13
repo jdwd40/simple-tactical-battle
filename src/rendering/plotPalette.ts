@@ -16,6 +16,11 @@ export const PLOT_COLOURS = {
   commandInk: 0x1b1407,
   hostile: 0xef9078,
   sonar: 0x86c9bd,
+  space: 0x071012,
+  star: 0xb7cbc6,
+  rock: 0x3b4a48,
+  rockLight: 0x8a9d98,
+  rockShadow: 0x1a2423,
 } as const
 
 export const PLOT_FONT = '"Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif'

@@ -5,15 +5,19 @@ import { ConsoleButton } from '../components/ConsoleButton'
 import { Panel } from '../components/Panel'
 import { PhaseTrack } from '../components/PhaseTrack'
 import { StatusTag } from '../components/StatusTag'
-import { ConsoleLayout } from '../layout/ConsoleLayout'
+import { ConsoleLayout, type MobileTab } from '../layout/ConsoleLayout'
 import { Battlefield } from '../gameplay/Battlefield'
 import { MovementOrders } from '../gameplay/MovementOrders'
 import { PlaybackControls } from '../gameplay/PlaybackControls'
 import { PlotReadout } from '../gameplay/PlotReadout'
 import { presentGameView } from '../gameplay/viewAdapters'
+import { CombatFeed } from './CombatFeed'
+import { combatCues, recentCues } from './combatReport'
+import { CombatSummary } from './CombatSummary'
 import { assessmentLines, OUTCOME_TEXT } from './consoleText'
 import { EventLog } from './EventLog'
 import { OwnShipStatus } from './OwnShipStatus'
+import { ResourceBars } from './ResourceBars'
 import { SeedControl } from './SeedControl'
 import { SystemOrders } from './SystemOrders'
 import type { OrderCapabilities } from './systemsText'
@@ -21,9 +25,14 @@ import { WeaponOrders } from './WeaponOrders'
 import './game.css'
 
 const TURN_PHASES = ['Planning', 'Commit', 'Execution', 'Assessment'] as const
+/** Combat cues stay on the plot banner and resource bars this many ticks (presentation only). */
+const COMBAT_FEED_TICKS = 25
 const PHASE_LABEL: Record<GameView['phase'], (typeof TURN_PHASES)[number] | undefined> = {
   planning: 'Planning', commit: 'Commit', execution: 'Execution', assessment: 'Assessment', terminal: undefined,
 }
+
+/** Assessment lines the combat summary already states (fire, hits, unfired reasons, damage). */
+const notCombatLine = (line: string) => !/^(Laser|Missile) (fired|did not fire)|^Shields -?\d+, hull/.test(line)
 
 function turnNumber(view: GameView) {
   return (view.phase === 'planning' ? view.draft.turnIndex : view.frame.observation.turnIndex) + 1
@@ -72,6 +81,21 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
   const plotWeapon = view.phase === 'planning' ? view.draft.weapon
     : (view.phase === 'commit' || (view.phase === 'execution' && !view.automatic)) && !fired ? view.lockedOwnOrders?.weapon ?? null : null
   const weaponRules = useMemo(() => ({ laserRangeUnits: view.rules.laser.rangeUnits, blastRadiusUnits: view.rules.missile.blastRadiusUnits }), [view.rules])
+  // Combat cues from the cursor-bounded prefix only: seeking back removes later ones.
+  const cues = useMemo(
+    () => combatCues(presentation.replay?.events ?? [], { rules: view.rules, map: view.frame.observation.map }),
+    [presentation.replay, view.rules, view.frame.observation.map],
+  )
+  const feed = recentCues(cues, view.frame.tick, COMBAT_FEED_TICKS)
+  const latestHit = [...cues].reverse().find((cue) => cue.kind === 'incoming' && cue.tick > view.frame.tick - COMBAT_FEED_TICKS)
+  const recentDamage = latestHit ? { shieldsLost: latestHit.shieldsLost ?? 0, hullLost: latestHit.hullLost ?? 0 } : null
+  // Phone panel choice; an assessment or ending brings the orders column (with its summary) forward.
+  const [mobileTab, setMobileTab] = useState<MobileTab>('orders')
+  const [tabPhase, setTabPhase] = useState(view.phase)
+  if (tabPhase !== view.phase) {
+    setTabPhase(view.phase)
+    if (view.phase === 'assessment' || view.phase === 'terminal' || view.phase === 'planning') setMobileTab('orders')
+  }
   const scene = useMemo(
     () => buildScene({ frames: presentation.frames, routePreview: presentation.routePreview, sensors: view.rules.sensors, draftSensor, selectedAlias, weapon: plotWeapon, weaponRules }),
     [presentation.frames, presentation.routePreview, view.rules.sensors, draftSensor, selectedAlias, plotWeapon, weaponRules],
@@ -144,7 +168,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
     : `Turn ${turn} is committed. Orders unlock when you plan the next turn.`
 
   const ordersPanel = presentation.movement && orders && (
-    <Panel title="Orders" status={<StatusTag>{view.phase === 'planning' ? 'Draft' : 'Locked'}</StatusTag>}>
+    <Panel title="Orders" mobilePanel="orders" status={<StatusTag>{view.phase === 'planning' ? 'Draft' : 'Locked'}</StatusTag>}>
       <MovementOrders
         // Entry fields are encounter-local: a restart starts them blank.
         key={view.encounterId}
@@ -209,18 +233,19 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
       const ending = OUTCOME_TEXT[view.result.outcome.outcome]
       return (
         <>
-          <Panel title="Encounter over" status={<StatusTag>{ending.title}</StatusTag>}>
+          <Panel title="Encounter over" mobilePanel="orders" status={<StatusTag>{ending.title}</StatusTag>}>
             <p className="outcome-title" data-testid="outcome">{ending.title}</p>
             <p className="pending-note">{ending.line}</p>
+            <CombatSummary assessment={view.result.assessment} context={{ rules, map }} startTick={view.replay?.startTick ?? view.result.assessment.revealTick - rules.timing.turnTicks} />
             <ul className="assessment-lines mt-3">
-              {assessmentLines(view.result.assessment, { rules, map }, view.replay?.startTick).map((line) => <li key={line}>{line}</li>)}
+              {assessmentLines(view.result.assessment, { rules, map }, view.replay?.startTick).filter(notCombatLine).map((line) => <li key={line}>{line}</li>)}
             </ul>
             <div className="assessment-actions">
               {endingActions}
               <ConsoleButton variant="quiet" onClick={() => controller.playback({ kind: 'play' })}>Replay final turn</ConsoleButton>
             </div>
           </Panel>
-          <Panel title="Event log" className="event-log">
+          <Panel title="Event log" className="event-log" mobilePanel="log">
             <EventLog replay={presentation.replay} rules={rules} map={map} />
           </Panel>
         </>
@@ -228,7 +253,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
     }
     if (view.phase === 'terminal') {
       return (
-        <Panel title="Encounter ended" status={<StatusTag>Abandoned</StatusTag>}>
+        <Panel title="Encounter ended" mobilePanel="orders" status={<StatusTag>Abandoned</StatusTag>}>
           <p className="pending-note">You abandoned the encounter. No combat result was recorded.</p>
           <div className="assessment-actions">{endingActions}</div>
         </Panel>
@@ -240,9 +265,10 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
     return (
       <>
         {view.phase === 'assessment' && (
-          <Panel title={`Turn ${turn} assessment`}>
+          <Panel title={`Turn ${turn} assessment`} mobilePanel="orders">
+            <CombatSummary assessment={view.assessment} context={{ rules, map }} startTick={view.replay.startTick} />
             <ul className="assessment-lines">
-              {assessmentLines(view.assessment, { rules, map }, view.replay.startTick).map((line) => <li key={line}>{line}</li>)}
+              {assessmentLines(view.assessment, { rules, map }, view.replay.startTick).filter(notCombatLine).map((line) => <li key={line}>{line}</li>)}
             </ul>
             <div className="assessment-actions">
               <ConsoleButton ref={planNextRef} variant="commit" onClick={() => controller.finishAssessment()}>Plan turn {turn + 1}</ConsoleButton>
@@ -251,7 +277,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
           </Panel>
         )}
         {view.phase === 'execution' && assessed && (
-          <Panel title={`Replaying turn ${turn}`} status={<StatusTag>Replay</StatusTag>}>
+          <Panel title={`Replaying turn ${turn}`} mobilePanel="orders" status={<StatusTag>Replay</StatusTag>}>
             <p className="pending-note">Replay shows the recorded turn as your ship saw it. Nothing is simulated again.</p>
             <div className="assessment-actions">
               <ConsoleButton onClick={() => controller.playback({ kind: 'skipToEnd' })}>Back to assessment</ConsoleButton>
@@ -260,7 +286,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
           </Panel>
         )}
         {endedReplay && (
-          <Panel title="Replaying the final turn" status={<StatusTag>Replay</StatusTag>}>
+          <Panel title="Replaying the final turn" mobilePanel="orders" status={<StatusTag>Replay</StatusTag>}>
             <p className="pending-note">The result appears again only when playback reaches it. Nothing is simulated again.</p>
             <div className="assessment-actions">
               <ConsoleButton onClick={() => controller.playback({ kind: 'skipToEnd' })}>Back to result</ConsoleButton>
@@ -268,7 +294,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
           </Panel>
         )}
         {automatic && (
-          <Panel title="Shadow-Dancer destroyed" status={<StatusTag>Automatic</StatusTag>}>
+          <Panel title="Shadow-Dancer destroyed" mobilePanel="orders" status={<StatusTag>Automatic</StatusTag>}>
             <p className="pending-note" data-testid="automatic-note">
               Your ship was destroyed, so you give no more orders. Remaining ordnance plays out in automatic turns while the patrol plans from its own observation. The result appears once nothing is left in flight.
             </p>
@@ -276,7 +302,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
         )}
         {ordersPanel}
         {(view.phase === 'planning' || view.phase === 'commit' || (view.phase === 'execution' && !assessed && !endedReplay && !automatic)) && (
-          <div className="commit-station">
+          <div className="commit-station" data-mobile-panel="any">
             <ConsoleButton
               variant="commit"
               unavailable={!canCommit}
@@ -288,7 +314,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
             <p id="commit-note" className="commit-note">{commitNote}</p>
           </div>
         )}
-        <Panel title="Event log" className="event-log">
+        <Panel title="Event log" className="event-log" mobilePanel="log">
           <EventLog replay={presentation.replay} rules={rules} map={map} />
         </Panel>
       </>
@@ -331,7 +357,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
         shipRail={
           <>
             <Panel title="Own ship" status={view.phase === 'execution' || view.phase === 'assessment' || (view.phase === 'terminal' && view.replay) ? <StatusTag>At playback time</StatusTag> : undefined}>
-              <OwnShipStatus ship={own} tick={view.frame.tick} rules={rules} />
+              <OwnShipStatus ship={own} tick={view.frame.tick} rules={rules} damage={recentDamage} />
             </Panel>
             <Panel title="Plot readout">
               <PlotReadout
@@ -356,6 +382,7 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
               describedBy="plot-readout"
             />
             {aiming && <p className="plot-caption aim-caption" role="status">Aiming the missile: select a cell on the plot. Press Escape to stop.</p>}
+            <CombatFeed cues={feed} />
           </>
         }
         transport={
@@ -367,6 +394,9 @@ export function GameConsole({ controller, capabilities, opponentNote, modeLabel,
           />
         }
         commandRail={commandRail}
+        hud={<ResourceBars ship={own} damage={recentDamage} compact />}
+        mobileTab={mobileTab}
+        onMobileTab={setMobileTab}
       />
     </>
   )

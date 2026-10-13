@@ -92,11 +92,12 @@ test('shots, hits, telemetry and hostile tracks appear only from their recorded 
   await seek(page, 4)
   expect((await drawn(page)).effects).toEqual([])
   await seek(page, 5)
-  expect((await drawn(page)).effects).toEqual(['own-beam', 'impact-laser'])
+  expect((await drawn(page)).effects).toEqual(['own-beam', 'hit-laser'])
   await expect(page.getByTestId('own-laser')).toHaveText('Cooling, 5.0 s')
 
   await seek(page, 12)
-  expect((await drawn(page)).effects).toEqual(['hostile-beam', 'own-hit'])
+  // Newest first; the tick-5 beam and hit are still shown (presentation durations).
+  expect((await drawn(page)).effects).toEqual(['hostile-beam', 'own-hit', 'own-beam', 'hit-laser'])
   await expect(page.locator('.event-item').first()).toContainText('Hit: 35 shields and 0 hull lost.')
   await page.screenshot({ path: testInfo.outputPath('combat-hostile-laser-hit-1366x768.png') })
 
@@ -119,12 +120,12 @@ test('shots, hits, telemetry and hostile tracks appear only from their recorded 
   await seek(page, 30)
   const detonated = await drawn(page)
   expect(detonated.ownMissiles).toEqual([])
-  expect(detonated.effects).toEqual(['impact-missile'])
+  expect(detonated.effects).toEqual(['impact-missile', 'own-hit', 'hit-laser'])
   await page.screenshot({ path: testInfo.outputPath('combat-missile-impact-1366x768.png') })
 
   // Back before the launch: the missile, the track and their marks are gone again.
   await seek(page, 10)
-  expect(await drawn(page)).toMatchObject({ ownMissiles: [], hostileMissiles: [], effects: [] })
+  expect(await drawn(page)).toMatchObject({ ownMissiles: [], hostileMissiles: [], effects: ['own-beam', 'hit-laser'] })
   await expect(page.locator('.event-item[data-kind="own-shot"]')).toHaveCount(1)
   expect(errors).toEqual([])
 })

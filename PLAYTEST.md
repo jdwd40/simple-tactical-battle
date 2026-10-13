@@ -31,6 +31,24 @@ play a specific encounter, for example `/?seed=17`.
 - **Keyboard:** Tab moves through every control in planning order; arrow keys change the
   sensor, cloak and weapon choices; "Skip to orders" jumps straight to the orders.
 - **Briefing** reopens the introduction at any time without changing the encounter.
+- **Phones:** the plot sits under a compact energy/shields/hull strip, with playback below it.
+  The **Orders**, **Ship** and **Log** tabs switch the panel underneath, and **Commit turn N** stays
+  pinned at the bottom. Tap the plot to set a course; everything else is a tap on a control.
+  Landscape puts the plot on the left and the panels on the right.
+
+## Reading combat
+
+- **Your laser:** an amber beam to the target. **Hit: contact-N** (a starburst) appears only when
+  your ship observed the impact on that contact. "No impact observed" means exactly that; it
+  does not claim a miss.
+- **Missiles:** an explosion that names no ship is shown as **Impact: damage unconfirmed**, for
+  example when one hits an asteroid.
+- **Hits on you:** a sea-glass flare for shields and a jagged coral burst for hull, with the exact
+  loss beside your ship, in the banner over the plot and on the resource bars. The attacker is
+  named only if you saw it fire.
+- **After each turn,** whether played or skipped, the assessment opens with a combat summary:
+  your fire and what was observed of it, the damage you took, and why an order did not fire.
+  Seeking back in playback removes anything that had not happened yet.
 
 ## Seeds and reproduction
 

@@ -55,8 +55,8 @@ describe('main mission against the real patrol AI', () => {
     const events = ending.replay?.events ?? []
     expect(events.filter((event) => event.kind === 'observed-shot').map((event) => event.tick)).toEqual([837])
     expect(events.some((event) => event.kind === 'own-destruction' && event.tick === 837)).toBe(true)
-    // The frigate's patrol scan and both search phases were its own choices: one pulse each.
-    expect(resolveTurn.mock.calls.filter(([, locked]) => locked.orders.patrol?.sensor === 'activePulse')).toHaveLength(2)
+    // The frigate chooses its own scans (three with the accepted TSB-51 planner).
+    expect(resolveTurn.mock.calls.filter(([, locked]) => locked.orders.patrol?.sensor === 'activePulse')).toHaveLength(3)
   })
 
   it('plans once per planning entry: draft edits never reroll the frigate, and the same seed replays exactly', () => {

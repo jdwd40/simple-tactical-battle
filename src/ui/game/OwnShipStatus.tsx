@@ -1,15 +1,14 @@
 import type { OwnShipObservation, Ruleset, Tick } from '../../contracts'
 import { Readouts } from '../components/Readouts'
-import { energyText } from './consoleText'
+import { ResourceBars, type RecentDamage } from './ResourceBars'
 import { cloakShortText, exposureStatusText, readinessText, sensorStatusText } from './systemsText'
 
 /** Own gauges and actual sensor/cloak/exposure at the frame being shown (the playback cursor during execution). */
-export function OwnShipStatus({ ship, tick, rules }: { ship: OwnShipObservation; tick: Tick; rules: Ruleset }) {
+export function OwnShipStatus({ ship, tick, rules, damage = null }: { ship: OwnShipObservation; tick: Tick; rules: Ruleset; damage?: RecentDamage | null }) {
   return (
+    <>
+    <ResourceBars ship={ship} damage={damage} />
     <Readouts items={[
-      { label: 'Energy', value: `${energyText(ship.energy.currentMilli)} / ${energyText(ship.energy.maxMilli)}` },
-      { label: 'Shields', value: `${ship.shields.current} / ${ship.shields.max}` },
-      { label: 'Hull', value: `${ship.hull.current} / ${ship.hull.max}` },
       { label: 'Missiles', value: `${ship.ammunition.current} / ${ship.ammunition.max}` },
       ...(ship.equipment.laser ? [{ label: 'Laser', value: <span data-testid="own-laser">{readinessText(ship.clocks.laserReadyTick, tick, rules)}</span> }] : []),
       ...(ship.equipment.missileLauncher ? [{ label: 'Launcher', value: <span data-testid="own-launcher">{readinessText(ship.clocks.missileReadyTick, tick, rules)}</span> }] : []),
@@ -18,5 +17,6 @@ export function OwnShipStatus({ ship, tick, rules }: { ship: OwnShipObservation;
       { label: 'Exposure', value: <span data-testid="own-exposure">{exposureStatusText(ship, tick, rules)}</span> },
       ...(ship.status === 'destroyed' ? [{ label: 'Status', value: 'Destroyed' }] : []),
     ]} />
+    </>
   )
 }

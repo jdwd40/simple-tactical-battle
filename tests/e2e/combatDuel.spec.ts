@@ -101,7 +101,7 @@ test('laser duel to victory: lock, cost, cooldown, replay before effects, reveal
   expect((await drawn(page)).effects).toEqual([])
   await expect(page.getByTestId('own-laser')).toHaveText('Ready')
   await seek(page, 201)
-  expect((await drawn(page)).effects).toEqual(['own-beam', 'impact-laser'])
+  expect((await drawn(page)).effects).toEqual(['own-beam', 'hit-laser'])
   await expect(page.getByTestId('own-laser')).toHaveText('Cooling, 5.0 s')
   await page.screenshot({ path: testInfo.outputPath('duel-laser-beam-1366x768.png') })
   await seek(page, 251)

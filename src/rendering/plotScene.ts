@@ -35,6 +35,8 @@ export interface PlotOwnMissile {
   readonly position: Position
   readonly aim: Cell
   readonly updatedTick: Tick
+  /** Its own recent telemetry positions, oldest first (exhaust trail). */
+  readonly trail: readonly Position[]
 }
 
 /** Observed hostile ordnance: a measured sighting or an aged last sighting. Never its aim. */
@@ -45,6 +47,8 @@ export interface PlotHostileMissile {
   readonly measurementTick: Tick
   readonly ageTicks: number
   readonly uncertaintyRadiusUnits: number
+  /** Consecutive current sightings just before this one, oldest first; empty for a last sighting. */
+  readonly trail: readonly Position[]
 }
 
 /** The draft (or committed, not yet fired) weapon intent as a plot preview. */
@@ -52,16 +56,36 @@ export type PlotWeaponPlan =
   | { readonly kind: 'laser'; readonly alias: string; readonly target: Position | null; readonly current: boolean; readonly rangeUnits: number }
   | { readonly kind: 'missile'; readonly aim: Cell; readonly blastRadiusUnits: number }
 
-/** Short-lived marks for recorded events at or just before the shown tick. */
-export type PlotEffect = { readonly ageTicks: number } & (
+/**
+ * Marks for recorded events at or before the shown tick, from published events only:
+ *   beam      a laser discharge (own, to the contact's measured position; or an observed enemy shot at us)
+ *   hit       an observed impact naming a contact: a confirmed hit on it
+ *   impact    an observed impact naming no contact: an explosion, ship damage unconfirmed
+ *   own-hit   damage this ship took (exact shields/hull lost; no invented source)
+ *   destroyed an observed destruction at its published position
+ *   scan      this ship's successful active pulse
+ */
+export type PlotEffect = { readonly ageTicks: number; readonly durationTicks: number } & (
   | { readonly kind: 'beam'; readonly from: Position; readonly to: Position; readonly own: boolean }
+  | { readonly kind: 'hit'; readonly at: Position; readonly alias: string; readonly weapon: 'laser' | 'missile'; readonly radiusUnits: number }
   | { readonly kind: 'impact'; readonly at: Position; readonly weapon: 'laser' | 'missile'; readonly radiusUnits: number }
-  | { readonly kind: 'own-hit'; readonly at: Position }
+  | { readonly kind: 'own-hit'; readonly at: Position; readonly shieldsLost: number; readonly hullLost: number }
   | { readonly kind: 'launch'; readonly at: Position; readonly own: boolean }
+  | { readonly kind: 'destroyed'; readonly at: Position; readonly own: boolean; readonly alias: string | null }
+  | { readonly kind: 'scan'; readonly at: Position; readonly radiusUnits: number }
 )
 
-/** Recorded events stay marked for this many ticks after their own tick. */
-export const EFFECT_TICKS = 5
+/**
+ * How long each mark stays, in ticks after its own tick. Presentation only: it never changes
+ * when anything happened, and seeking back before the tick removes it again.
+ */
+export const EFFECT_DURATION: Readonly<Record<PlotEffect['kind'], number>> = {
+  beam: 12, hit: 30, impact: 25, 'own-hit': 30, launch: 10, destroyed: 45, scan: 15,
+}
+const LONGEST_EFFECT = Math.max(...Object.values(EFFECT_DURATION))
+type WithoutDuration<T> = T extends unknown ? Omit<T, 'durationTicks'> : never
+/** Missile trails use at most this many recent recorded positions. */
+const TRAIL_FRAMES = 10
 
 export type PlotPlan =
   | { readonly kind: 'hold' }
@@ -76,6 +100,10 @@ export interface PlotScene {
     readonly position: Position; readonly headingMilliDegrees: number; readonly destroyed: boolean
     /** Actual cloak and exposure at this frame (not the request). */
     readonly cloaked: boolean; readonly exposed: boolean
+    /** Own shields and hull at this frame as fractions of their maxima. */
+    readonly shieldFraction: number; readonly hullFraction: number
+    /** Moved since the previous recorded frame (engine glow). */
+    readonly moving: boolean
   }
   readonly sensorRings: readonly PlotSensorRing[]
   /** Own positions through the current frame, oldest first. */
@@ -111,17 +139,42 @@ function withStart(start: Position, waypoints: readonly Position[]): Position[] 
   return waypoints.length > 0 && samePosition(start, waypoints[0]) ? [...waypoints] : [start, ...waypoints]
 }
 
-function toHostileMissile(memory: HostileOrdnanceMemory): PlotHostileMissile {
+function toHostileMissile(memory: HostileOrdnanceMemory, frames: readonly PublicReplayFrame[]): PlotHostileMissile {
+  // Trail only through consecutive current sightings: never across a gap in knowledge.
+  const trail: Position[] = []
+  if (memory.kind === 'current') {
+    let expected = memory.measurement.tick - 1
+    for (let index = frames.length - 2; index >= 0 && trail.length < TRAIL_FRAMES; index -= 1) {
+      const seen = frames[index].observation.hostileMissiles.find((other) => other.alias === memory.alias)
+      if (!seen || seen.kind !== 'current' || seen.measurement.tick !== expected) break
+      trail.unshift(seen.measurement.position)
+      expected -= 1
+    }
+  }
   return {
     alias: memory.alias, kind: memory.kind, position: memory.measurement.position, measurementTick: memory.measurement.tick,
-    ageTicks: memory.ageTicks, uncertaintyRadiusUnits: memory.uncertaintyRadiusUnits,
+    ageTicks: memory.ageTicks, uncertaintyRadiusUnits: memory.uncertaintyRadiusUnits, trail,
   }
 }
 
-/** Marks for events recorded in the last EFFECT_TICKS frames, using only those frames' data. */
-function recentEffects(frames: readonly PublicReplayFrame[], tick: Tick, blastRadiusUnits: number): PlotEffect[] {
+function ownMissileTrail(id: string, frames: readonly PublicReplayFrame[]): Position[] {
+  const trail: Position[] = []
+  for (let index = frames.length - 2; index >= 0 && trail.length < TRAIL_FRAMES; index -= 1) {
+    const telemetry = frames[index].observation.ownMissiles.find((missile) => missile.id === id && missile.status === 'flying')
+    if (!telemetry) break
+    trail.unshift(telemetry.position)
+  }
+  return trail
+}
+
+/** Marks for events recorded in recent frames (through the shown tick), using only those frames' data. */
+function recentEffects(frames: readonly PublicReplayFrame[], tick: Tick, blastRadiusUnits: number, scanRadiusUnits: number): PlotEffect[] {
   const effects: PlotEffect[] = []
-  for (let index = frames.length - 1; index >= 0 && frames[index].tick > tick - EFFECT_TICKS; index -= 1) {
+  const add = (effect: WithoutDuration<PlotEffect>) => {
+    const durationTicks = EFFECT_DURATION[effect.kind]
+    if (effect.ageTicks < durationTicks) effects.push({ ...effect, durationTicks } as PlotEffect)
+  }
+  for (let index = frames.length - 1; index >= 0 && frames[index].tick > tick - LONGEST_EFFECT; index -= 1) {
     const frame = frames[index]
     const ageTicks = tick - frame.tick
     const own = frame.observation.ownShip.position
@@ -130,15 +183,23 @@ function recentEffects(frames: readonly PublicReplayFrame[], tick: Tick, blastRa
         if (event.weapon.kind === 'laser') {
           const alias = event.weapon.contactAlias
           const target = frame.observation.contacts.find((contact) => contact.alias === alias)
-          if (target) effects.push({ kind: 'beam', from: event.position, to: target.measurement.position, own: true, ageTicks })
-        } else effects.push({ kind: 'launch', at: event.position, own: true, ageTicks })
+          if (target) add({ kind: 'beam', from: event.position, to: target.measurement.position, own: true, ageTicks })
+        } else add({ kind: 'launch', at: event.position, own: true, ageTicks })
       } else if (event.kind === 'observed-shot') {
-        if (event.weapon === 'laser') effects.push({ kind: 'beam', from: event.position, to: own, own: false, ageTicks })
-        else effects.push({ kind: 'launch', at: event.position, own: false, ageTicks })
+        if (event.weapon === 'laser') add({ kind: 'beam', from: event.position, to: own, own: false, ageTicks })
+        else add({ kind: 'launch', at: event.position, own: false, ageTicks })
       } else if (event.kind === 'observed-impact') {
-        effects.push({ kind: 'impact', at: event.position, weapon: event.weapon, radiusUnits: event.weapon === 'missile' ? blastRadiusUnits : 0, ageTicks })
+        const radiusUnits = event.weapon === 'missile' ? blastRadiusUnits : 0
+        if (event.contactAlias) add({ kind: 'hit', at: event.position, alias: event.contactAlias, weapon: event.weapon, radiusUnits, ageTicks })
+        else add({ kind: 'impact', at: event.position, weapon: event.weapon, radiusUnits, ageTicks })
       } else if (event.kind === 'own-damage') {
-        effects.push({ kind: 'own-hit', at: own, ageTicks })
+        add({ kind: 'own-hit', at: own, shieldsLost: event.shieldsLost, hullLost: event.hullLost, ageTicks })
+      } else if (event.kind === 'observed-destruction') {
+        add({ kind: 'destroyed', at: event.position, own: false, alias: event.contactAlias, ageTicks })
+      } else if (event.kind === 'own-destruction') {
+        add({ kind: 'destroyed', at: event.position, own: true, alias: null, ageTicks })
+      } else if (event.kind === 'own-energy' && event.reason === 'pulse' && scanRadiusUnits > 0) {
+        add({ kind: 'scan', at: own, radiusUnits: scanRadiusUnits, ageTicks })
       }
     }
   }
@@ -207,6 +268,9 @@ export function buildScene({ frames, routePreview = null, sensors = null, draftS
     ownShip: {
       position: own.position, headingMilliDegrees: own.headingMilliDegrees, destroyed,
       cloaked: own.cloak.actual, exposed: own.clocks.exposureUntilTick > current.tick,
+      shieldFraction: own.shields.max > 0 ? own.shields.current / own.shields.max : 0,
+      hullFraction: own.hull.max > 0 ? own.hull.current / own.hull.max : 0,
+      moving: frames.length > 1 && !samePosition(frames[frames.length - 2].observation.ownShip.position, own.position),
     },
     trail,
     plan,
@@ -215,9 +279,9 @@ export function buildScene({ frames, routePreview = null, sensors = null, draftS
     weaponPlan,
     ownMissiles: current.observation.ownMissiles
       .filter((missile) => missile.status === 'flying')
-      .map((missile) => ({ id: missile.id, position: missile.position, aim: missile.aim, updatedTick: missile.updatedTick })),
-    hostileMissiles: current.observation.hostileMissiles.map(toHostileMissile),
-    effects: recentEffects(frames, current.tick, weaponRules?.blastRadiusUnits ?? 0),
+      .map((missile) => ({ id: missile.id, position: missile.position, aim: missile.aim, updatedTick: missile.updatedTick, trail: ownMissileTrail(missile.id, frames) })),
+    hostileMissiles: current.observation.hostileMissiles.map((memory) => toHostileMissile(memory, frames)),
+    effects: recentEffects(frames, current.tick, weaponRules?.blastRadiusUnits ?? 0, sensors?.activeUncloakedRangeUnits ?? 0),
   }
 }
 

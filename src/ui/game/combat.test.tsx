@@ -90,22 +90,43 @@ describe('combat on the plot uses recorded public data only', () => {
     expect(buildScene({ frames: [frame], weapon: { kind: 'hold' }, weaponRules }).weaponPlan).toBeNull()
   })
 
-  it('marks beams, impacts and hits for a few ticks after their recorded tick, never before', () => {
+  it('marks fire, confirmed hits and own damage from their recorded tick for a set time, never before', () => {
     const shot = withEvents(frameAt(412, position, [current('contact-1', { x: 8500, y: 10_500 }, 412)]), [
       event(412, { kind: 'own-shot', position, weapon: { kind: 'laser', contactAlias: 'contact-1' } }),
       event(412, { kind: 'observed-shot', sourceAlias: 'contact-1', position: { x: 8500, y: 10_500 }, weapon: 'laser' }, 1),
       event(412, { kind: 'own-damage', shieldsLost: 35, hullLost: 0 }, 2),
       event(412, { kind: 'observed-impact', position: { x: 8500, y: 10_500 }, weapon: 'laser', contactAlias: 'contact-1' }, 3),
+      event(412, { kind: 'observed-impact', position: { x: 12_500, y: 4500 }, weapon: 'missile' }, 4),
     ])
     const before = frameAt(411, position)
-    const after = (tick: number) => frameAt(tick, position)
-    expect(buildScene({ frames: [before] }).effects).toEqual([])
-    const at = buildScene({ frames: [before, shot] }).effects
-    expect(at.map((effect) => effect.kind)).toEqual(['beam', 'beam', 'own-hit', 'impact'])
+    const after = (count: number) => Array.from({ length: count }, (_, k) => frameAt(413 + k, position))
+    const kinds = (frames: PublicReplayFrame[]) => buildScene({ frames, weaponRules: { laserRangeUnits: 6000, blastRadiusUnits: 750 } }).effects.map((effect) => effect.kind)
+    expect(kinds([before])).toEqual([])
+    const at = buildScene({ frames: [before, shot], weaponRules: { laserRangeUnits: 6000, blastRadiusUnits: 750 } }).effects
+    expect(at.map((effect) => effect.kind)).toEqual(['beam', 'beam', 'own-hit', 'hit', 'impact'])
     expect(at[0]).toMatchObject({ from: position, to: { x: 8500, y: 10_500 }, own: true, ageTicks: 0 })
     expect(at[1]).toMatchObject({ from: { x: 8500, y: 10_500 }, to: position, own: false })
-    expect(buildScene({ frames: [before, shot, after(413), after(414), after(415), after(416)] }).effects.every((effect) => effect.ageTicks === 4)).toBe(true)
-    expect(buildScene({ frames: [before, shot, after(413), after(414), after(415), after(416), after(417)] }).effects).toEqual([])
+    expect(at[2]).toMatchObject({ shieldsLost: 35, hullLost: 0 })
+    expect(at[3]).toMatchObject({ alias: 'contact-1', weapon: 'laser' })
+    // An impact naming no contact stays an unconfirmed explosion with its blast radius.
+    expect(at[4]).toMatchObject({ kind: 'impact', weapon: 'missile', radiusUnits: 750 })
+    // Beams fade first; confirmed hits and own damage stay longer; all are gone after their time.
+    expect(kinds([before, shot, ...after(12)])).toEqual(['own-hit', 'hit', 'impact'])
+    expect(kinds([before, shot, ...after(25)])).toEqual(['own-hit', 'hit'])
+    expect(kinds([before, shot, ...after(30)])).toEqual([])
+  })
+
+  it('names destructions and scans at their published ticks only', () => {
+    const blast = withEvents(frameAt(500, position), [
+      event(500, { kind: 'observed-destruction', contactAlias: 'contact-1', position: { x: 9500, y: 9500 } }),
+      event(500, { kind: 'own-energy', deltaMilli: -12_000, reason: 'pulse' }, 1),
+    ])
+    const scene = buildScene({ frames: [frameAt(499, position), blast], sensors: DUEL_RULES.sensors })
+    expect(scene.effects).toEqual([
+      expect.objectContaining({ kind: 'destroyed', own: false, alias: 'contact-1', at: { x: 9500, y: 9500 } }),
+      expect.objectContaining({ kind: 'scan', radiusUnits: 10_000 }),
+    ])
+    expect(buildScene({ frames: [frameAt(499, position)], sensors: DUEL_RULES.sensors }).effects).toEqual([])
   })
 
   it('draws own missiles from telemetry and hostile ordnance as sightings without aim, interpolating only known intervals', () => {
@@ -119,7 +140,12 @@ describe('combat on the plot uses recorded public data only', () => {
     }
     const a = buildScene({ frames: [frame(410, 5000, 'current')] })
     const b = buildScene({ frames: [frame(411, 5200, 'current')] })
-    expect(a.ownMissiles).toEqual([{ id: 'own-1', position: { x: 5000, y: 10_500 }, aim: { column: 12, row: 10 }, updatedTick: 410 }])
+    expect(a.ownMissiles).toEqual([{ id: 'own-1', position: { x: 5000, y: 10_500 }, aim: { column: 12, row: 10 }, updatedTick: 410, trail: [] }])
+    // Trails use only this side's recorded positions: telemetry for own missiles, consecutive sightings for hostile ones.
+    const pair = buildScene({ frames: [frame(410, 5000, 'current'), frame(411, 5200, 'current')] })
+    expect(pair.ownMissiles[0].trail).toEqual([{ x: 5000, y: 10_500 }])
+    expect(pair.hostileMissiles[0].trail).toEqual([{ x: 7000, y: 6000 }])
+    expect(buildScene({ frames: [frame(410, 5000, 'current'), frame(411, 5200, 'stale')] }).hostileMissiles[0].trail).toEqual([])
     expect(JSON.stringify(a.hostileMissiles)).not.toContain('aim')
     const mid = interpolateScene(a, b, 0.5)
     expect(mid.ownMissiles[0].position).toEqual({ x: 5100, y: 10_500 })
@@ -166,7 +192,9 @@ describe('assessment and endings', () => {
     })
     expect(html).toContain('data-testid="outcome">Victory</p>')
     expect(html).toContain('The patrol frigate is destroyed and Shadow-Dancer survives.')
-    expect(html).toContain('Laser fired at 1.2 s.')
+    expect(html).toContain('<span class="combat-summary-time">1.2 s</span><span>Laser fired.</span>')
+    expect(html).toContain('Damage taken: 35 shields, 0 hull')
+    expect(html).not.toContain('Nothing hit you.')
     for (const name of ['Restart encounter', 'New encounter', 'Replay final turn']) expect(html).toContain(`>${name}</button>`)
     expect(html).not.toContain('Commit turn')
     expect(html).not.toMatch(/drill/i)
@@ -181,7 +209,7 @@ describe('assessment and endings', () => {
     expect(html).toContain('Shadow-Dancer destroyed')
     expect(html).toContain('Remaining ordnance plays out in automatic turns while the patrol plans from its own observation.')
     expect(html).not.toContain('Commit turn')
-    expect(html).not.toContain('>Orders<')
+    expect(html).not.toMatch(/<h2[^>]*>Orders<\/h2>/)
     expect(readinessText(520, 500, rules)).toBe('Cooling, 2.0 s')
   })
 })
