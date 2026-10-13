@@ -70,10 +70,14 @@ export function Battlefield({ encounterId, map, rules, scene, playback, selectab
   useEffect(() => {
     const renderer = rendererRef.current
     if (!renderer || ready !== encounterId) return
+    // Smooth only while actively playing with motion allowed. A republish of the same tick
+    // during playback continues the current tween; pause, seek or reduced motion snap.
     const previous = previousSceneRef.current
-    const smoothing = previous && playback?.playing && !reducedMotion && scene.tick === previous.tick + 1
-      ? { from: previous, durationMs: rules.timing.tickMs / playback.speed }
-      : null
+    const animating = playback?.playing === true && !reducedMotion && previous !== null
+    const smoothing = !animating || !playback ? null
+      : scene.tick === previous.tick + 1 ? { from: previous, durationMs: rules.timing.tickMs / playback.speed }
+        : scene.tick === previous.tick ? 'continue' as const
+          : null
     renderer.update({ map, unitsPerCell: rules.geometry.unitsPerCell, scene, smoothing, selectable })
     previousSceneRef.current = scene
   }, [ready, encounterId, map, rules, scene, playback, selectable, reducedMotion])

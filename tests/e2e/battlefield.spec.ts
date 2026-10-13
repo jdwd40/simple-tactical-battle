@@ -235,6 +235,79 @@ test('smooths only known one-tick steps while playing, and snaps under reduced m
   expect(await sampleTransitions()).toEqual(new Set(['snap']))
 })
 
+type Sample = { readonly t: number; readonly transition: string; readonly x: number; readonly tick: number }
+type SamplerWindow = { __samples: Sample[]; __plotDiagnostics: () => RendererDiagnostics }
+
+/** Records the drawn summary on every animation frame, so mid-tween behaviour is observable. */
+async function startSampler(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as SamplerWindow
+    w.__samples = []
+    const loop = () => {
+      const last = w.__plotDiagnostics().last
+      if (last) w.__samples.push({ t: performance.now(), transition: last.transition, x: last.ownShip.x, tick: last.tick })
+      requestAnimationFrame(loop)
+    }
+    requestAnimationFrame(loop)
+  })
+}
+const samplesAfter = (page: Page, at: number) =>
+  page.evaluate((at) => (window as unknown as SamplerWindow).__samples.filter((sample) => sample.t > at), at)
+
+async function waitForTween(page: Page) {
+  await expect.poll(async () => (await drawn(page)).transition, { intervals: [10] }).toBe('smooth')
+}
+
+test('pausing or enabling reduced motion mid-tween snaps at once to the known frame', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await open(page, '?mode=execution')
+  await page.locator('.speed-option', { hasText: '0.5×' }).click()
+  await startSampler(page)
+
+  // Pause while a 200ms tween is in flight.
+  await page.getByRole('button', { name: 'Play' }).click()
+  await waitForTween(page)
+  const pausedAt = await page.evaluate(() => {
+    const at = performance.now()
+    document.querySelector<HTMLButtonElement>('.playback button:nth-child(2)')!.click()
+    return at
+  })
+  await page.waitForTimeout(400)
+  const afterPause = await samplesAfter(page, pausedAt + 50)
+  expect(afterPause.length).toBeGreaterThan(5)
+  expect(new Set(afterPause.map((sample) => sample.transition))).toEqual(new Set(['snap']))
+  expect(new Set(afterPause.map((sample) => sample.x)).size).toBe(1)
+  const paused = await drawn(page)
+  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('paused-mid-tween.png') })
+
+  // The snapped position is frame n exactly: stepping back and forward redraws the same point.
+  await page.getByRole('button', { name: 'Back' }).click()
+  await page.getByRole('button', { name: 'Forward' }).click()
+  await expect.poll(async () => (await drawn(page)).tick).toBe(paused.tick)
+  expect((await drawn(page)).ownShip).toEqual(paused.ownShip)
+
+  // Enable reduced motion while playback continues and a tween is in flight. The check is
+  // anchored to when the page itself observes the preference change, not when it was requested.
+  await page.evaluate(() => {
+    const w = window as unknown as SamplerWindow & { __reducedAt?: number }
+    matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => { w.__reducedAt ??= performance.now() })
+  })
+  await page.getByRole('button', { name: 'Play' }).click()
+  await waitForTween(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const reducedAt = await expect.poll(() => page.evaluate(() => (window as unknown as { __reducedAt?: number }).__reducedAt ?? null)).not.toBeNull()
+    .then(() => page.evaluate(() => (window as unknown as { __reducedAt: number }).__reducedAt))
+  await page.waitForTimeout(600)
+  // Allow two animation frames for React to commit the preference before the plot must snap.
+  const afterReduce = await samplesAfter(page, reducedAt + 34)
+  expect(afterReduce.length).toBeGreaterThan(5)
+  const lateSmooth = afterReduce.filter((sample) => sample.transition === 'smooth').map((sample) => Math.round(sample.t - reducedAt))
+  expect(lateSmooth, 'ms after the page observed reduced motion').toEqual([])
+  expect(Math.max(...afterReduce.map((sample) => sample.tick))).toBeGreaterThan(paused.tick)
+  await page.getByRole('button', { name: 'Pause' }).click()
+})
+
 test('mounting, unmounting and changing encounter never accumulates renderers or canvases', async ({ page }) => {
   const errors = trackErrors(page)
   await open(page)

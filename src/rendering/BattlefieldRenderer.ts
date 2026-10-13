@@ -16,8 +16,13 @@ export interface RendererFrame {
   readonly map: PublicMap
   readonly unitsPerCell: number
   readonly scene: PlotScene
-  /** Animate from this earlier scene (exactly one tick before) over the duration; null snaps. */
-  readonly smoothing: { readonly from: PlotScene; readonly durationMs: number } | null
+  /**
+   * Animate from an earlier scene (exactly one tick before) over the duration. `continue`
+   * keeps an in-flight tween to this same tick on its original schedule (a republish during
+   * active playback) and otherwise snaps. null always cancels any tween and snaps to `scene`
+   * (pause, seek, reduced motion).
+   */
+  readonly smoothing: { readonly from: PlotScene; readonly durationMs: number } | 'continue' | null
   readonly selectable: boolean
 }
 
@@ -159,12 +164,13 @@ export class BattlefieldRenderer {
     if (!this.app || this.disposed) return
     if (terrainChanged) this.layoutAndDrawTerrain()
     this.app.canvas.style.cursor = frame.selectable ? 'crosshair' : 'default'
-    if (!frame.smoothing && this.animatingTo?.tick === frame.scene.tick) {
+    const smoothing = frame.smoothing
+    if (smoothing === 'continue' && this.animatingTo?.tick === frame.scene.tick) {
       this.animatingTo = frame.scene
       return
     }
     this.stopAnimation()
-    if (frame.smoothing && frame.smoothing.durationMs > 0) this.animate(frame.smoothing.from, frame.scene, frame.smoothing.durationMs)
+    if (smoothing && smoothing !== 'continue' && smoothing.durationMs > 0) this.animate(smoothing.from, frame.scene, smoothing.durationMs)
     else this.drawDynamic(frame.scene, 'snap')
   }
 
