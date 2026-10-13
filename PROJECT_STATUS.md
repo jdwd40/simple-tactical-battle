@@ -6,7 +6,7 @@ Canonical: /home/jd/projects/tactical-space-battle/PROJECT_STATUS.md. Sole write
 
 The user approved automated implementation through M3's local release candidate on 2026-10-12: "plan is aproved. All systems go. Run automated as much as possible from now on". Local commits, integration, tests and corrections are authorised. No default/release-branch merge, remote push or public deployment is authorised.
 
-Repository /home/jd/projects/tactical-space-battle, local branch tsb/integration, no remote. Accepted source fbac43a90851306bad065ba62e1ae9a6ef066c21; documentation checkpoints follow in Git. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e.
+Repository /home/jd/projects/tactical-space-battle, local branch tsb/integration, no remote. Accepted source 088a5229df52b04dc9859c5b88c9cdfe4f1b982c; documentation checkpoints follow in Git. Baseline c315b14409ce101fc5c296bc5e533ee91ca9bc7e.
 
 M0 COMPLETE: approved rules/contracts, runnable scaffold, public initial scenario and reviewed console. Combined build/typecheck/lint, 57 unit tests and 7 Chromium tests passed at b71fe73. This was startup, not gameplay.
 
@@ -14,7 +14,7 @@ M1 COMPLETE: real headless movement engine, PixiJS plot, application controller 
 
 M2A COMPLETE atc279edb: sensors/stealth20, real UI21 and information regressions22 REVIEWED/INTEGRATED. Combined build/typecheck/lint,215unit/25files and27Chromium tests at4391 passed. Reviewer21 also verified production scan/replay/restart, keyboard/reduced motion and contact selection/expiry;22/r1 confirmed strict nested future-payload audit and negative controls. Reviewed sensor-code preview is available (artifact sourcea3beb00, runtime unchanged by22 test-only additions).
 
-Current M2B acceptance: both weapons/resources, shield/hull damage, swept projectile/obstacle behavior, cross-turn/launcher-death persistence, simultaneous destruction and safe outcomes. General30A lasers/shared damage PASS/integrated4940506/64738f4; combined226unit/26files/build/type/lint pass. General30B PASS/integrated7f01a3f/9f2e3d2; combined241unit/27files/build/type/lint pass. UI31 real-laser checkpoint44c4415 (248unit/33browser) rebased conflict-free onto accepted30B, headdac8ed6; final31 deliveredb455105 with267unit/36browser/production pass, initialindependentreviewactive.32 PASS/integratedfbac43a; combined248unit/build/type/lint pass.40 deliveredb0e2b7a255unit/14AItests,9boundedencounters, reviewqueuedafter31. Formal M2B still awaits31/32 review and combined browser verification; finalM2C waits completeAI/mission integration41/42.
+Current M2B acceptance: both weapons/resources, shield/hull damage, swept projectile/obstacle behavior, cross-turn/launcher-death persistence, simultaneous destruction and safe outcomes. General30A lasers/shared damage PASS/integrated4940506/64738f4; combined226unit/26files/build/type/lint pass. General30B PASS/integrated7f01a3f/9f2e3d2; combined241unit/27files/build/type/lint pass. UI31 real-laser checkpoint44c4415 (248unit/33browser) rebased conflict-free onto accepted30B, headdac8ed6; 31 finalb455105 round0 PASS/integrated159916e/d0ad835/aa1dffc/088a522; independent267unit/36browser/production and4realafterlife/reentrantprobes pass; combinedM2Bchecksactive.32 PASS/integratedfbac43a; combined248unit/build/type/lint pass.40 deliveredb0e2b7a255unit/14AItests,9boundedencounters, independentreviewactive. Formal M2B still awaits31/32 review and combined browser verification; finalM2C waits completeAI/mission integration41/42.
 
 ## Confirmed factory mapping and recovery
 
@@ -24,9 +24,9 @@ Current workspace w7; preserve existing tab names and original sessions. Revalid
 | --- | --- | --- | --- |
 | Lead | w7:p1 / Sol6.1M | 01a12cb2-14ea-7df1-9e72-3d26779d541c | Active orchestration/integration |
 | General | w7:p8 / opusx builder | 09697ee9-8599-4a78-926d-23fd735b9c69 | TSB-40 /1 delivered; available pending queuedreview |
-| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | TSB-31 /1 delivered; available pending findings |
+| UI | w7:p5 / opus UI | a9360339-a6cf-46b7-8e1b-11e28d7e9ab1 | Available;31 /1 round0 PASS/integrated |
 | Assistant | w7:p9 / Codex Jnr | 01a1318b-b734-7c43-a314-4c5a78839c48 | Available;32 /1 PASS/integrated |
-| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | REVIEW-TSB-31 /1/round0 active;40 queuednext |
+| Reviewer | w7:p7 / sol6.1h Review | 01a131d6-82cc-7160-aa30-8be514aebede | REVIEW-TSB-40 /1/round0 active;31 PASS preserved |
 
 Earlier outages: Herdr stopped at 22:58:38 UTC Oct12 and 05:21 UTC Oct13. User established kernel OOM killed headless Chrome, then systemd OOMPolicy=stop ended the scope. User added 4G swap and moved Herdr to herdr.service with OOMPolicy=continue; infrastructure investigation ended. General moved p3→p8 and Assistant p6→p9; original sessions restored, existing /home/jd trust confirmations explicitly authorised and cleared. Reviewer/Assistant native resume had lost their original full-access policy; the same UUIDs were resumed with their recorded original permissions, without model changes. Reviewer browser access subsequently passed. Interrupted REVIEW-TSB-11B /2/round1 was re-run and accepted. No current recovery blocker.
 
@@ -52,9 +52,9 @@ One active assignment per builder; independent reviewer source read-only. Initia
 | TSB-22 Assistant /1→2 | assistant-22 / tsb/22-information / 7a3c3439f104e9f49f260eb13cb80eb0a95cdc42 |e3eff4d round0 CHANGES_REQUIRED (test audit gap, no production leak); fixed6332e686fb1891b2fe8d9375d96c00a9503a9e0c round1 PASS; integrateda4b9f33/c279edb; combined215unit/27browser/build/type/lint pass |
 | TSB-30A General /1 | general-30a / tsb/30a-lasers / c279edbd3c9c945a3bbbd472a895379dd5f22dae |d3e526eb4b0b6fed227cc799b5bc7e22614357d8 (engine0dfdbcb+docs) round0 PASS; integrated4940506/64738f4; combined226unit/build/type/lint pass; independent seed73 range/funding50/100/200ms/reversedbatch/privacy probes pass |
 | TSB-30B General /1 | general-30b / tsb/30b-missiles / 64738f42537d44aeb85f52f6282c4cf93d38d72a | deb0c6a955605c0661a3867f7cc3bfd48e57f6af (enginee027e8c+docs) round0 PASS; integrated7f01a3f/9f2e3d2; combined241unit/build/type/lint pass;6independent seed83 sweep/funding/persistence/privacy probes pass |
-| TSB-31 UI /1 | ui-31 / tsb/31-combat-ui / originalc279edb; reviewbase9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | Finalb4551055c2b45993f4007ead4131974db331f8a3 delivered267unit/30files,36browser/build/type/lint/production pass; allrealweapon/aftermath evidence; round0 active reviews/31-r0 |
+| TSB-31 UI /1 | ui-31 / tsb/31-combat-ui / originalc279edb; reviewbase9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | Finalb4551055c2b45993f4007ead4131974db331f8a3 round0 PASS; integrated159916e/d0ad835/aa1dffc/088a522;267unit/36browser/production and4independentrealafterlife/reentrancyprobes pass; combinedchecksactive |
 | TSB-32 Assistant /1 | assistant-32 / tsb/32-combat-regressions / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 |38fb1cd46cba8fd1cbda44fec2288b965ba86f50 round0 PASS; integratedfbac43a; combined248unit/build/type/lint pass; independentnegativeblindholdcontrol and reproducibleinputs verified |
-| TSB-40 General /1 | general-40 / tsb/40-opponent / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | Deliveredb0e2b7ae92ccf5e30657d5bc8fc04628210085d0;255unit/29files/build/type/lint pass,14AItests/9boundedencounters,0invalidorders/fallbacks/cutoffs; reviewqueued reviews/40-r0 |
+| TSB-40 General /1 | general-40 / tsb/40-opponent / 9f2e3d2074f3bcd0ef53de86ffa86f9bf611cde8 | Deliveredb0e2b7ae92ccf5e30657d5bc8fc04628210085d0;255unit/29files/build/type/lint pass,14AItests/9boundedencounters,0invalidorders/fallbacks/cutoffs; round0 active reviews/40-r0 |
 
 Original assignments, reports and review verdicts: handoffs/. Exact detached snapshots: reviews/<task>-r<round>; Git worktree list records retained heads. TSB-11C report-a2/review-r1 documents the three corrected blockers: nested view immutability, re-entrant restart/abandon during commit, and blank grid fields after restart. No further review of that accepted change is pending.
 
