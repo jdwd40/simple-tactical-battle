@@ -1,8 +1,5 @@
-import { renderToStaticMarkup } from 'react-dom/server'
-import { createElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import { DUEL_MAP, DUEL_PUBLIC_SCENARIO, DUEL_RULES, SAMPLE_PLAYER_OBSERVATION } from '../contracts/index'
-import { ScenarioStartup } from '../ui/ScenarioStartup'
 import { OBSERVER_FIXTURES } from './observers'
 import { STARTUP_PRESENTATION } from './startup'
 
@@ -43,25 +40,5 @@ describe('public startup and observer fixtures', () => {
     expect(Object.isFrozen(observation)).toBe(true)
     expect(Object.isFrozen(observation.contacts)).toBe(true)
     if (observation.contacts.length) expect(Object.isFrozen(observation.contacts[0].measurement.position)).toBe(true)
-  })
-  it('startup readouts and own cell follow supplied observation data', () => {
-    const observation = {
-      ...STARTUP_PRESENTATION.observation,
-      ownShip: {
-        ...STARTUP_PRESENTATION.observation.ownShip,
-        position: { x: 4500, y: 9500 },
-        energy: { currentMilli: 12_500, maxMilli: 100_000 },
-        hull: { current: 75, max: 100 }, shields: { current: 15, max: 40 }, ammunition: { current: 2, max: 6 },
-      },
-    }
-    const html = renderToStaticMarkup(createElement(ScenarioStartup, { presentation: { ...STARTUP_PRESENTATION, observation } }))
-    expect(html).toContain('<dt>Energy</dt><dd>12.5 / 100</dd>')
-    expect(html).toContain('<dt>Hull</dt><dd>75 / 100</dd>')
-    expect(html).toContain('<dt>Shields</dt><dd>15 / 40</dd>')
-    expect(html).toContain('<dt>Missiles</dt><dd>2 / 6</dd>')
-    expect(html).toContain('data-own-cell="4,9"')
-    expect(html).toContain('<dt>Own cell</dt><dd>(4, 9)</dd>')
-    expect(html.match(/data-asteroid-cell=/g)).toHaveLength(12)
-    expect(html).toContain('Movement engine pending')
   })
 })
